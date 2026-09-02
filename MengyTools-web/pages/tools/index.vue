@@ -1,31 +1,48 @@
 <script setup lang="ts">
 const { data: tools } = await useAsyncData('tools-list', () =>
-  useApi().get<Array<{ id: number; name: string; description: string; link: string }>>(
-    '/v1/tools'
-  )
+  useApi().get<Array<{
+    id: number
+    name: string
+    description: string
+    link: string
+    componentRoute: string
+    icon: string
+  }>>('/v1/tools')
 )
 
 useSeoMeta({
   title: '效率工具 - MengyTools',
   description: '常用效率工具卡片'
 })
+
+const list = computed(() => tools.value ?? [])
 </script>
 
 <template>
-  <div>
-    <h1>效率工具</h1>
-    <div class="grid">
+  <div class="container">
+    <h1 class="page-title">效率工具</h1>
+    <p class="page-subtitle">常用工具卡片 · 即开即用</p>
+
+    <div v-if="list.length" class="grid">
       <a
-        v-for="t in tools ?? []"
+        v-for="t in list"
         :key="t.id"
-        :href="t.link"
+        :href="t.link || t.componentRoute"
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
         class="card tool-card"
       >
-        <h3>{{ t.name }}</h3>
-        <p>{{ t.description }}</p>
+        <div class="tool-icon">{{ t.icon || '🛠️' }}</div>
+        <div class="tool-body">
+          <h3>{{ t.name }}</h3>
+          <p>{{ t.description || '暂无描述' }}</p>
+        </div>
+        <span class="tool-arrow">↗</span>
       </a>
+    </div>
+    <div v-else class="empty-state card">
+      <div class="emoji">🛠️</div>
+      <p>暂无工具</p>
     </div>
   </div>
 </template>
@@ -33,24 +50,65 @@ useSeoMeta({
 <style scoped>
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
 }
 .tool-card {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
   color: inherit;
-  transition: transform 0.2s;
+  position: relative;
 }
 .tool-card:hover {
   transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-light);
 }
-.tool-card h3 {
+.tool-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+}
+.tool-body {
+  flex: 1;
+  min-width: 0;
+}
+.tool-body h3 {
   margin: 0 0 6px;
-  color: #409eff;
+  font-size: 16px;
+  font-weight: 600;
 }
-.tool-card p {
+.tool-body p {
   margin: 0;
-  color: #777;
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tool-arrow {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.tool-card:hover .tool-arrow {
+  opacity: 1;
+  transform: translate(2px, -2px);
+  color: var(--primary);
 }
 </style>

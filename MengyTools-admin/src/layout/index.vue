@@ -20,6 +20,28 @@ const handleLogout = async () => {
           <el-icon><HomeFilled /></el-icon>
           <span>首页</span>
         </el-menu-item>
+        <el-sub-menu index="content">
+          <template #title>
+            <el-icon><Edit /></el-icon>
+            <span>内容管理</span>
+          </template>
+          <el-menu-item index="/content/blog">
+            <el-icon><Edit /></el-icon>
+            <span>文章管理</span>
+          </el-menu-item>
+          <el-menu-item index="/content/blog-category">
+            <el-icon><Files /></el-icon>
+            <span>博客分类</span>
+          </el-menu-item>
+          <el-menu-item index="/content/nav-site">
+            <el-icon><Link /></el-icon>
+            <span>导航站点</span>
+          </el-menu-item>
+          <el-menu-item index="/content/nav-category">
+            <el-icon><FolderOpened /></el-icon>
+            <span>导航分类</span>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
 
