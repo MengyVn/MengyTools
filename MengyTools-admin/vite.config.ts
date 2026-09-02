@@ -32,7 +32,7 @@ export default defineConfig({
     proxy: {
       // 后端 API 代理，避免开发环境跨域
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: 'http://127.0.0.1:8120',
         changeOrigin: true
       }
     }

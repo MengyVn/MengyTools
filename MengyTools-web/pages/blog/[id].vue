@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { marked } from 'marked'
+
 const route = useRoute()
 const id = route.params.id
 
@@ -8,37 +10,176 @@ const { data: article } = await useAsyncData(`blog-${id}`, () =>
     title: string
     content: string
     summary: string
+    cover: string
+    categoryName: string | null
+    viewCount: number
+    publishTime: string
     createTime: string
   }>(`/v1/blog/articles/${id}`)
 )
 
+const htmlContent = computed(() => {
+  if (!article.value?.content) return ''
+  try {
+    return marked.parse(article.value.content, { async: false }) as string
+  } catch {
+    return ''
+  }
+})
+
 useSeoMeta({
-  title: () => article.value?.title || '文章详情',
+  title: () => article.value?.title ? `${article.value.title} - MengyTools` : '文章详情',
   description: () => article.value?.summary || ''
 })
 </script>
 
 <template>
-  <article class="card" v-if="article">
-    <h1>{{ article.title }}</h1>
-    <div class="meta">{{ article.createTime }}</div>
-    <div class="content" v-html="article.content" />
-  </article>
-  <div v-else class="card empty">文章不存在或已被删除</div>
+  <div class="container">
+    <article v-if="article" class="card article">
+      <div class="article-head">
+        <div class="article-meta">
+          <span v-if="article.categoryName" class="tag">{{ article.categoryName }}</span>
+          <span class="time">{{ (article.publishTime || article.createTime || '').slice(0, 10) }}</span>
+          <span v-if="article.viewCount" class="views">👁 {{ article.viewCount }} 阅读</span>
+        </div>
+        <h1 class="article-title">{{ article.title }}</h1>
+        <p v-if="article.summary" class="article-summary">{{ article.summary }}</p>
+      </div>
+
+      <div class="article-content markdown-body" v-html="htmlContent" />
+    </article>
+    <div v-else class="empty-state card">
+      <div class="emoji">📄</div>
+      <p>文章不存在或已被删除</p>
+      <NuxtLink to="/blog" class="back-link">← 返回博客列表</NuxtLink>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.meta {
-  color: #999;
-  font-size: 14px;
-  margin-bottom: 20px;
+.article {
+  padding: 40px 48px;
 }
-.content {
+.article-head {
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+.article-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.tag {
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--primary);
+  font-weight: 500;
+}
+.time,
+.views {
+  color: var(--text-tertiary);
+}
+.article-title {
+  margin: 0 0 12px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.article-summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* Markdown 渲染样式 */
+.article-content {
   line-height: 1.8;
+  font-size: 15px;
 }
-.empty {
-  text-align: center;
-  color: #999;
-  padding: 40px;
+.article-content :deep(h1),
+.article-content :deep(h2),
+.article-content :deep(h3),
+.article-content :deep(h4) {
+  margin: 1.6em 0 0.8em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.article-content :deep(h1) { font-size: 26px; }
+.article-content :deep(h2) {
+  font-size: 22px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 6px;
+}
+.article-content :deep(h3) { font-size: 19px; }
+.article-content :deep(p) { margin: 0.8em 0; }
+.article-content :deep(a) { color: var(--primary); }
+.article-content :deep(img) {
+  max-width: 100%;
+  border-radius: var(--radius);
+  margin: 16px 0;
+}
+.article-content :deep(code) {
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+.article-content :deep(pre) {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.article-content :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.article-content :deep(blockquote) {
+  border-left: 4px solid var(--primary-light);
+  padding: 8px 16px;
+  margin: 16px 0;
+  color: var(--text-secondary);
+  background: rgba(99, 102, 241, 0.04);
+}
+.article-content :deep(ul),
+.article-content :deep(ol) {
+  padding-left: 24px;
+  margin: 0.8em 0;
+}
+.article-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+.article-content :deep(th),
+.article-content :deep(td) {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+.article-content :deep(th) {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.back-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .article { padding: 24px 20px; }
+  .article-title { font-size: 22px; }
 }
 </style>
