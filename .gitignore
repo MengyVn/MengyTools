@@ -1,0 +1,54 @@
+# ===== 不纳入仓库的本地目录 =====
+Doc/
+AIndex-script/
+
+# ===== Java / Maven =====
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+.mvn/
+mvnw
+mvnw.cmd
+HELP.md
+!.mvn/wrapper/maven-wrapper.properties
+
+# ===== Node / 前端 =====
+node_modules/
+dist/
+dist-ssr/
+.nuxt/
+.output/
+.nitro/
+.cache/
+.vite/
+*.tsbuildinfo
+.npmrc
+
+# ===== 环境变量与密钥 =====
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.properties
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.factorypath
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+logs/
