@@ -104,18 +104,18 @@ const handleSubmit = async (status?: number) => {
     }
     if (isEdit.value && id.value) {
       await updateArticle(id.value, payload)
-      ElMessage.success('保存成功')
+      ElMessage.success('保存完成')
     } else {
       await createArticle(payload)
-      ElMessage.success('创建成功')
-      router.push('/content/blog')
+      ElMessage.success('创建完成')
+      router.push('/blog/article')
     }
   } finally {
     submitting.value = false
   }
 }
 
-const handleBack = () => router.push('/content/blog')
+const handleBack = () => router.push('/blog/article')
 
 onMounted(fetchData)
 </script>

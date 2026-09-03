@@ -2,7 +2,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, WarningFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
@@ -11,6 +11,7 @@ const userStore = useUserStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const errorMsg = ref('')
 const form = reactive({
   username: 'admin',
   password: 'admin123'
@@ -26,13 +27,16 @@ const handleLogin = async (formEl?: FormInstance) => {
   await formEl.validate(async (valid) => {
     if (!valid) return
     loading.value = true
+    errorMsg.value = ''
     try {
       await userStore.login(form)
       ElMessage.success('登录成功')
       const redirect = (route.query.redirect as string) || '/'
       router.replace(redirect)
-    } catch {
-      // 错误已由拦截器统一提示
+    } catch (e: unknown) {
+      // 由登录页统一在表单下方红字提示，不弹右上角消息
+      const err = e as { message?: string }
+      errorMsg.value = err?.message || '登录失败，请稍后重试'
     } finally {
       loading.value = false
     }
@@ -42,11 +46,6 @@ const handleLogin = async (formEl?: FormInstance) => {
 
 <template>
   <div class="login-page">
-    <!-- 背景光斑 -->
-    <div class="blob blob-1" />
-    <div class="blob blob-2" />
-    <div class="blob blob-3" />
-
     <div class="login-card">
       <!-- 头部 -->
       <div class="card-header">
@@ -77,6 +76,11 @@ const handleLogin = async (formEl?: FormInstance) => {
             @keyup.enter="handleLogin(formRef)"
           />
         </el-form-item>
+        <!-- 错误提示：连续输错 5 次将锁定 IP -->
+        <div v-if="errorMsg" class="error-tip">
+          <el-icon><WarningFilled /></el-icon>
+          <span>{{ errorMsg }}</span>
+        </div>
         <el-form-item>
           <el-button
             type="primary"
@@ -104,59 +108,18 @@ const handleLogin = async (formEl?: FormInstance) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  background: linear-gradient(135deg, #1e3a8a 0%, #4c1d95 50%, #831843 100%);
-}
-
-/* 背景光斑 */
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.5;
-  animation: float 18s ease-in-out infinite;
-}
-.blob-1 {
-  width: 480px;
-  height: 480px;
-  background: #6366f1;
-  top: -120px;
-  left: -80px;
-}
-.blob-2 {
-  width: 420px;
-  height: 420px;
-  background: #ec4899;
-  bottom: -100px;
-  right: -60px;
-  animation-delay: -6s;
-}
-.blob-3 {
-  width: 360px;
-  height: 360px;
-  background: #06b6d4;
-  top: 40%;
-  left: 50%;
-  animation-delay: -12s;
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, -30px) scale(1.05); }
-  66% { transform: translate(-30px, 40px) scale(0.95); }
+  background: linear-gradient(135deg, #eef2f7 0%, #e3e9f2 100%);
 }
 
 .login-card {
   position: relative;
   z-index: 1;
-  width: 420px;
-  padding: 40px 36px 28px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  width: 400px;
+  padding: 40px 36px 24px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
 }
 
 .card-header {
@@ -167,61 +130,46 @@ const handleLogin = async (formEl?: FormInstance) => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    background: linear-gradient(135deg, #6366f1, #ec4899);
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    background: #409eff;
   }
   .logo-icon {
     font-size: 26px;
     font-weight: 700;
     color: #fff;
-    letter-spacing: -1px;
   }
   .title {
     margin: 14px 0 4px;
     font-size: 22px;
     font-weight: 600;
-    color: #fff;
+    color: #303133;
     letter-spacing: 0.5px;
   }
   .subtitle {
     margin: 0;
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.65);
+    color: #909399;
   }
 }
 
-/* Element Plus 暗背景下的输入框样式覆盖 */
-:deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  box-shadow: none !important;
-  transition: all 0.25s;
-
-  &:hover {
-    border-color: rgba(255, 255, 255, 0.3);
+.error-tip {
+  margin: 0 0 16px;
+  padding: 9px 12px;
+  background: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 6px;
+  color: #f56c6c;
+  font-size: 13px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  .el-icon {
+    flex-shrink: 0;
+    font-size: 16px;
   }
-  &.is-focus {
-    border-color: #6366f1;
-    background: rgba(255, 255, 255, 0.12);
-  }
-}
-:deep(.el-input__inner) {
-  color: #fff;
-  height: 44px;
-  &::placeholder {
-    color: rgba(255, 255, 255, 0.45);
-  }
-}
-:deep(.el-input__prefix-inner) {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 16px;
-}
-:deep(.el-input__suffix-inner) {
-  color: rgba(255, 255, 255, 0.55);
 }
 
 .login-btn {
@@ -231,26 +179,14 @@ const handleLogin = async (formEl?: FormInstance) => {
   font-weight: 500;
   letter-spacing: 4px;
   border: none;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
-  background-size: 200% 200%;
-  background-position: 0% 0%;
-  transition: background-position 0.4s, transform 0.15s, box-shadow 0.25s;
-
-  &:hover {
-    background-position: 100% 100%;
-    box-shadow: 0 10px 28px rgba(99, 102, 241, 0.45);
-  }
-  &:active {
-    transform: scale(0.98);
-  }
+  border-radius: 8px;
 }
 
 .card-footer {
-  margin-top: 18px;
+  margin-top: 16px;
   text-align: center;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #c0c4cc;
 }
 
 /* 小屏适配 */
@@ -261,3 +197,4 @@ const handleLogin = async (formEl?: FormInstance) => {
   }
 }
 </style>
+

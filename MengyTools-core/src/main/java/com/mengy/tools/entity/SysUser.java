@@ -1,6 +1,7 @@
 package com.mengy.tools.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -9,6 +10,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 系统用户实体，对应表 sys_user。
@@ -49,4 +51,8 @@ public class SysUser implements Serializable {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    /** 非数据库字段：用户角色列表（用户列表接口填充） */
+    @TableField(exist = false)
+    private List<SysRole> roles;
 }

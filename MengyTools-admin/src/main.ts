@@ -2,9 +2,12 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+// 全量引入 Element Plus 样式（含 ElMessage/ElMessageBox 等 service API 的样式）
+import 'element-plus/dist/index.css'
 
 import App from './App.vue'
 import router from './router'
+import { permission } from './directives/permission'
 import './styles/index.css'
 
 const app = createApp(App)
@@ -13,6 +16,9 @@ const app = createApp(App)
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
+
+// 注册按钮权限指令
+app.directive('permission', permission)
 
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
