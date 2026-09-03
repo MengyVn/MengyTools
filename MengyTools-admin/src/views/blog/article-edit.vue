@@ -10,6 +10,7 @@ import {
   type ArticleForm,
   type BlogCategory
 } from '@/api/blog'
+import { uploadImage } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -117,6 +118,25 @@ const handleSubmit = async (status?: number) => {
 
 const handleBack = () => router.push('/blog/article')
 
+// 封面图片上传：成功后回填 URL（支持继续手动填写外链 URL）
+const fileInput = ref<HTMLInputElement>()
+const uploading = ref(false)
+const triggerUpload = () => fileInput.value?.click()
+const handleUpload = async (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploading.value = true
+  try {
+    const res = await uploadImage(file)
+    form.cover = res.url
+    ElMessage.success('上传完成')
+  } finally {
+    uploading.value = false
+    input.value = ''
+  }
+}
+
 onMounted(fetchData)
 </script>
 
@@ -161,8 +181,20 @@ onMounted(fetchData)
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="封面图 URL">
-          <el-input v-model="form.cover" placeholder="封面图地址（可选）" />
+        <el-form-item label="封面图">
+          <div class="cover-row">
+            <el-input v-model="form.cover" placeholder="填写图片 URL，或点击上传保存到服务器" />
+            <el-button :loading="uploading" @click="triggerUpload">上传图片</el-button>
+            <input ref="fileInput" type="file" accept="image/*" hidden @change="handleUpload" />
+          </div>
+          <el-image
+            v-if="form.cover"
+            :src="form.cover"
+            fit="cover"
+            class="cover-preview"
+            :preview-src-list="[form.cover]"
+            preview-teleported
+          />
         </el-form-item>
         <el-form-item label="摘要">
           <el-input v-model="form.summary" type="textarea" :rows="2" placeholder="文章摘要（可选）" maxlength="500" show-word-limit />
@@ -218,6 +250,18 @@ onMounted(fetchData)
 }
 .form-card {
   margin-bottom: 16px;
+  .cover-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .cover-preview {
+    margin-top: 8px;
+    width: 240px;
+    height: 120px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+  }
 }
 .editor-card {
   .card-head {

@@ -72,6 +72,13 @@ const sections = [
           :to="`/blog/${a.id}`"
           class="card article-item"
         >
+          <img
+            v-if="a.cover"
+            :src="a.cover"
+            :alt="a.title"
+            class="article-thumb"
+            loading="lazy"
+          />
           <div class="article-body">
             <div class="article-meta">
               <span v-if="a.categoryName" class="tag">{{ a.categoryName }}</span>
@@ -229,8 +236,18 @@ const sections = [
   gap: 16px;
 }
 .article-item {
-  display: block;
+  display: flex;
+  gap: 14px;
   color: inherit;
+}
+/* 封面缩略图 */
+.article-thumb {
+  width: 116px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  align-self: center;
 }
 .article-item:hover {
   transform: translateY(-3px);

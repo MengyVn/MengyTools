@@ -28,6 +28,9 @@ public class ArticleListItemDTO implements Serializable {
 
     private Integer isTop;
 
+    /** 0草稿 1已发布 2定时发布（管理端列表展示用，门户端不用） */
+    private Integer status;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime publishTime;
 

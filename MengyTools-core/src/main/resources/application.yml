@@ -18,6 +18,15 @@ server:
   compression:
     enabled: true
 
+# 文件上传限制
+spring.servlet.multipart:
+  max-file-size: 10MB
+  max-request-size: 20MB
+
+# 图片上传：保存到本机 nginx 图片目录，由 nginx(1096) location /images/ 对外提供
+mengy.upload:
+  dir: ${UPLOAD_DIR:/home/mengy/MyWeb/www/xtgc-sushe/images}
+
 # MyBatis-Plus
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml

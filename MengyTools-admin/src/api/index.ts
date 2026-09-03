@@ -31,3 +31,41 @@ export interface UserInfo {
   roles: string[]
   permissions: string[]
 }
+
+// 上传图片（返回相对路径，如 /images/xxx.jpg）
+export const uploadImage = (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<unknown, { url: string }>('/v1/admin/files/upload', formData)
+}
+
+// ==================== 仪表盘 ====================
+
+export interface DashboardSummary {
+  articleTotal: number
+  articlePublished: number
+  articleDraft: number
+  categoryTotal: number
+  navSiteTotal: number
+  navCategoryTotal: number
+  toolTotal: number
+  userTotal: number
+}
+
+export interface RecentArticle {
+  id: number
+  title: string
+  cover: string
+  categoryId: number
+  status: number
+  isTop: number
+  viewCount: number
+  publishTime: string | null
+  createTime: string
+}
+
+export const getDashboardSummary = () =>
+  request.get<unknown, DashboardSummary>('/v1/admin/dashboard/summary')
+
+export const getRecentArticles = () =>
+  request.get<unknown, { records: RecentArticle[] }>('/v1/admin/dashboard/recent-articles')

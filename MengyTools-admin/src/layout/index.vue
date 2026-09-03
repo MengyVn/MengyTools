@@ -50,7 +50,12 @@ function matchPath(menuPath: string, fullPath: string): boolean {
 
 const handleLogout = async () => {
   userStore.logout()
-  router.replace('/login')
+  router.push('/login')
+}
+
+// 前往门户前端（按当前访问的主机名动态拼接，支持 IP 访问）
+const goPortal = () => {
+  window.open(`http://${window.location.hostname}:9560`, '_blank')
 }
 </script>
 
@@ -94,18 +99,24 @@ const handleLogout = async () => {
           </el-breadcrumb>
           <span v-else class="title">管理后台</span>
         </div>
-        <el-dropdown trigger="click">
-          <span class="user">
-            <el-icon style="vertical-align: middle"><UserFilled /></el-icon>
-            {{ userStore.userInfo?.nickname || '管理员' }}
-            <el-icon><ArrowDown /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <div class="header-right">
+          <el-button text type="primary" @click="goPortal">
+            <el-icon style="margin-right: 4px"><Position /></el-icon>
+            前往门户
+          </el-button>
+          <el-dropdown trigger="click">
+            <span class="user">
+              <el-icon style="vertical-align: middle"><UserFilled /></el-icon>
+              {{ userStore.userInfo?.nickname || '管理员' }}
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </el-header>
 
       <el-main class="app-main">
@@ -171,6 +182,11 @@ const handleLogout = async () => {
   border-bottom: 1px solid #eee;
   .title {
     font-weight: 600;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   .user {
     cursor: pointer;

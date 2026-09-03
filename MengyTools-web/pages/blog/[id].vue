@@ -27,6 +27,31 @@ const htmlContent = computed(() => {
   }
 })
 
+// 阅读量埋点：仅在浏览器端上报，后端按「文章+访客ID」24h 去重计数
+const api = useApi()
+const visitorId = useCookie<string | undefined>('visitor_id', {
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: 'lax'
+})
+onMounted(() => {
+  if (!article.value) return
+  if (!visitorId.value) {
+    visitorId.value = crypto.randomUUID()
+  }
+  api
+    .post<boolean>('/v1/track/view', {
+      articleId: article.value.id,
+      visitorId: visitorId.value
+    })
+    .then((counted) => {
+      // 本次有效计数时本地即时 +1，无需刷新
+      if (counted && article.value) {
+        article.value.viewCount = (article.value.viewCount || 0) + 1
+      }
+    })
+    .catch(() => {})
+})
+
 useSeoMeta({
   title: () => article.value?.title ? `${article.value.title} - MengyTools` : '文章详情',
   description: () => article.value?.summary || ''
@@ -45,6 +70,14 @@ useSeoMeta({
         <h1 class="article-title">{{ article.title }}</h1>
         <p v-if="article.summary" class="article-summary">{{ article.summary }}</p>
       </div>
+
+      <!-- 封面图 -->
+      <img
+        v-if="article.cover"
+        :src="article.cover"
+        :alt="article.title"
+        class="article-cover"
+      />
 
       <div class="article-content markdown-body" v-html="htmlContent" />
     </article>
@@ -94,6 +127,16 @@ useSeoMeta({
   color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.7;
+}
+
+/* 封面图 */
+.article-cover {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 24px;
 }
 
 /* Markdown 渲染样式 */
