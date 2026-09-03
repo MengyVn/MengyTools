@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login as loginApi, getUserInfo, type LoginParams, type UserInfo } from '@/api'
+import { usePermissionStore } from '@/store/permission'
+import { resetRouter } from '@/router'
 
 export const useUserStore = defineStore(
   'user',
@@ -24,6 +26,9 @@ export const useUserStore = defineStore(
       token.value = ''
       refreshToken.value = ''
       userInfo.value = null
+      // 清除动态路由与权限状态，避免切换账号残留
+      usePermissionStore().reset()
+      resetRouter()
     }
 
     return { token, refreshToken, userInfo, login, fetchUserInfo, logout }

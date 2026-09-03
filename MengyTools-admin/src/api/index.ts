@@ -12,7 +12,9 @@ export interface LoginResult {
 
 // 登录
 export const login = (data: LoginParams) =>
-  request.post<unknown, LoginResult>('/v1/auth/login', data)
+  request.post<unknown, LoginResult>('/v1/auth/login', data, {
+    headers: { 'X-Skip-Toast': '1' }
+  })
 
 // 刷新 Token
 export const refresh = (refreshToken: string) =>

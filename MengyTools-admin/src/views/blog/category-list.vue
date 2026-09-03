@@ -50,7 +50,7 @@ const handleEdit = (row: BlogCategory) => {
 const handleDelete = async (row: BlogCategory) => {
   await ElMessageBox.confirm(`确定删除分类「${row.name}」吗？`, '提示', { type: 'warning' })
   await deleteBlogCategory(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success('已删除')
   fetchList()
 }
 
@@ -60,10 +60,10 @@ const handleSubmit = async () => {
     if (!valid) return
     if (editingId.value) {
       await updateBlogCategory(editingId.value, { name: form.name, slug: form.slug, sort: form.sort })
-      ElMessage.success('修改成功')
+      ElMessage.success('修改完成')
     } else {
       await createBlogCategory({ name: form.name, slug: form.slug, sort: form.sort })
-      ElMessage.success('新增成功')
+      ElMessage.success('新增完成')
     }
     dialogVisible.value = false
     fetchList()

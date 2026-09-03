@@ -52,16 +52,16 @@ const handleReset = () => {
 }
 
 const handleEdit = (row: ArticleListItem) => {
-  router.push(`/content/blog/edit/${row.id}`)
+  router.push(`/blog/article/edit/${row.id}`)
 }
 const handleCreate = () => {
-  router.push('/content/blog/edit/new')
+  router.push('/blog/article/edit/new')
 }
 
 const handleDelete = async (row: ArticleListItem) => {
   await ElMessageBox.confirm(`确定删除文章「${row.title}」吗？`, '提示', { type: 'warning' })
   await deleteArticle(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success('已删除')
   fetchList()
 }
 

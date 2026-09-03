@@ -92,7 +92,7 @@ const handleEdit = (row: NavSite) => {
 const handleDelete = async (row: NavSite) => {
   await ElMessageBox.confirm(`确定删除站点「${row.name}」吗？`, '提示', { type: 'warning' })
   await deleteNavSite(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success('已删除')
   fetchList()
 }
 
@@ -102,10 +102,10 @@ const handleSubmit = async () => {
     if (!valid) return
     if (editingId.value) {
       await updateNavSite(editingId.value, { ...form })
-      ElMessage.success('修改成功')
+      ElMessage.success('修改完成')
     } else {
       await createNavSite({ ...form })
-      ElMessage.success('新增成功')
+      ElMessage.success('新增完成')
     }
     dialogVisible.value = false
     fetchList()

@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { usePermissionStore } from '@/store/permission'
 
-const routes: RouteRecordRaw[] = [
+// 静态基础路由：登录 / 404 / 布局根(含静态首页)
+// 其余业务菜单由后端返回，经 generateRoutes 动态 addRoute 注入到 Layout 下。
+const staticRoutes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
@@ -10,6 +13,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
+    name: 'Layout',
     component: () => import('@/layout/index.vue'),
     redirect: '/home',
     children: [
@@ -18,36 +22,6 @@ const routes: RouteRecordRaw[] = [
         name: 'Home',
         component: () => import('@/views/home/index.vue'),
         meta: { title: '首页', icon: 'HomeFilled' }
-      },
-      {
-        path: 'content/blog',
-        name: 'ArticleList',
-        component: () => import('@/views/blog/article-list.vue'),
-        meta: { title: '文章管理', icon: 'Edit' }
-      },
-      {
-        path: 'content/blog/edit/:id',
-        name: 'ArticleEdit',
-        component: () => import('@/views/blog/article-edit.vue'),
-        meta: { title: '编辑文章', hidden: true }
-      },
-      {
-        path: 'content/blog-category',
-        name: 'BlogCategory',
-        component: () => import('@/views/blog/category-list.vue'),
-        meta: { title: '博客分类', icon: 'Files' }
-      },
-      {
-        path: 'content/nav-category',
-        name: 'NavCategory',
-        component: () => import('@/views/nav/category-list.vue'),
-        meta: { title: '导航分类', icon: 'FolderOpened' }
-      },
-      {
-        path: 'content/nav-site',
-        name: 'NavSite',
-        component: () => import('@/views/nav/site-list.vue'),
-        meta: { title: '导航站点', icon: 'Link' }
       }
     ]
   },
@@ -61,15 +35,29 @@ const routes: RouteRecordRaw[] = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes: staticRoutes
 })
 
-// 全局前置守卫：未登录跳转登录
-router.beforeEach((to, _from, next) => {
+/**
+ * 重置路由表为静态路由（退出登录 / 切换账号时清除动态路由）。
+ * vue-router 4 官方推荐方式：用全新 router 的 matcher 覆盖。
+ */
+export function resetRouter() {
+  const newRouter = createRouter({
+    history: createWebHistory(),
+    routes: staticRoutes
+  })
+  ;(router as unknown as { matcher: unknown }).matcher = newRouter.matcher
+}
+
+// 全局前置守卫：未登录跳登录；已登录首访时拉取用户信息 + 动态路由
+router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
+  const permissionStore = usePermissionStore()
   document.title = to.meta.title ? `${to.meta.title} - MengyTools` : 'MengyTools'
+
+  // 登录页：已登录直接进后台
   if (to.path === '/login') {
-    // 已登录用户访问登录页，直接进后台
     if (userStore.token) {
       next({ path: '/' })
       return
@@ -77,11 +65,31 @@ router.beforeEach((to, _from, next) => {
     next()
     return
   }
+
+  // 未登录
   if (!userStore.token) {
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
-  next()
+
+  // 已登录：确保用户信息 + 动态路由就绪
+  try {
+    if (!userStore.userInfo) {
+      await userStore.fetchUserInfo()
+    }
+    if (!permissionStore.loaded) {
+      const dynamicRoutes = await permissionStore.fetchMenus()
+      dynamicRoutes.forEach(r => router.addRoute('Layout', r))
+      // 动态路由注入后需重新进入当前目标，使其生效
+      next({ ...to, replace: true })
+      return
+    }
+    next()
+  } catch {
+    userStore.logout()
+    permissionStore.reset()
+    next({ path: '/login', query: { redirect: to.fullPath } })
+  }
 })
 
 export default router

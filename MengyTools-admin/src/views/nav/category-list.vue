@@ -86,7 +86,7 @@ const handleEdit = (row: NavCategory) => {
 const handleDelete = async (row: NavCategory) => {
   await ElMessageBox.confirm(`确定删除分类「${row.name}」吗？子分类需先自行处理。`, '提示', { type: 'warning' })
   await deleteNavCategory(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success('已删除')
   fetchList()
 }
 
@@ -98,12 +98,12 @@ const handleSubmit = async () => {
       await updateNavCategory(editingId.value, {
         parentId: form.parentId, name: form.name, icon: form.icon, sort: form.sort
       })
-      ElMessage.success('修改成功')
+      ElMessage.success('修改完成')
     } else {
       await createNavCategory({
         parentId: form.parentId, name: form.name, icon: form.icon, sort: form.sort
       })
-      ElMessage.success('新增成功')
+      ElMessage.success('新增完成')
     }
     dialogVisible.value = false
     fetchList()
