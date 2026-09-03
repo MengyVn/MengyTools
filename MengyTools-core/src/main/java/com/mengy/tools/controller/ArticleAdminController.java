@@ -3,6 +3,7 @@ package com.mengy.tools.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mengy.tools.common.Result;
 import com.mengy.tools.common.exception.BusinessException;
 import com.mengy.tools.common.ResultCode;
@@ -197,6 +198,8 @@ public class ArticleAdminController {
         /** 0草稿 1已发布 2定时发布 */
         private Integer status;
         private Integer isTop;
+        /** 前端回传格式与详情接口一致（yyyy-MM-dd HH:mm:ss），必须注解否则 Jackson 按 ISO 解析报 500 */
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         private LocalDateTime publishTime;
     }
 }

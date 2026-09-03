@@ -28,6 +28,12 @@ public class ArticleDetailDTO implements Serializable {
 
     private Long viewCount;
 
+    /** 0草稿 1已发布 2定时发布（管理端编辑回显用，门户端不用） */
+    private Integer status;
+
+    /** 是否置顶 0/1（管理端编辑回显用，门户端不用） */
+    private Integer isTop;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime publishTime;
 

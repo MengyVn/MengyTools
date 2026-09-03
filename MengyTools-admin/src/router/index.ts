@@ -80,8 +80,11 @@ router.beforeEach(async (to, _from, next) => {
     if (!permissionStore.loaded) {
       const dynamicRoutes = await permissionStore.fetchMenus()
       dynamicRoutes.forEach(r => router.addRoute('Layout', r))
-      // 动态路由注入后需重新进入当前目标，使其生效
-      next({ ...to, replace: true })
+      // 动态路由注入后需按 path 重新解析当前目标。
+      // 注意：不能直接 next({ ...to })——刷新时 to 已被 catch-all 匹配为
+      // NotFound，展开会把 name:'NotFound' 带过去（name 优先于 path），
+      // 导致重新导航仍落在 404 页。必须只保留 path/query/hash。
+      next({ path: to.path, query: to.query, hash: to.hash, replace: true })
       return
     }
     next()

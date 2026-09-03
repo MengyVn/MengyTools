@@ -3,6 +3,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
 
+  // 监听 0.0.0.0，允许通过 IP+端口 访问（默认仅 localhost）
+  devServer: {
+    host: '0.0.0.0',
+    port: 9560
+  },
+
   // SSR 服务端渲染（need.md：博客 SEO）
   ssr: true,
 
@@ -42,6 +48,11 @@ export default defineNuxtConfig({
     devProxy: {
       '/api': {
         target: 'http://127.0.0.1:8120/api',
+        changeOrigin: true
+      },
+      // 图片：转发到本机 nginx（devProxy 会剥掉 /images 前缀，故 target 需带 /images）
+      '/images': {
+        target: 'http://127.0.0.1:1096/images',
         changeOrigin: true
       }
     }

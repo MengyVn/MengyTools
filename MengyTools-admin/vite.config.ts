@@ -26,13 +26,18 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
+    port: 9567,
     host: true,
     open: true,
     proxy: {
       // 后端 API 代理，避免开发环境跨域
       '/api': {
         target: 'http://127.0.0.1:8120',
+        changeOrigin: true
+      },
+      // 图片：转发到本机 nginx（location /images/ -> xtgc-sushe/images）
+      '/images': {
+        target: 'http://127.0.0.1:1096',
         changeOrigin: true
       }
     }

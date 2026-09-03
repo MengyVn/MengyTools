@@ -34,6 +34,13 @@ const list = computed(() => articles.value ?? [])
         :to="`/blog/${a.id}`"
         class="card article-item"
       >
+        <img
+          v-if="a.cover"
+          :src="a.cover"
+          :alt="a.title"
+          class="article-thumb"
+          loading="lazy"
+        />
         <div class="article-body">
           <div class="article-meta">
             <span v-if="a.isTop" class="tag tag-top">置顶</span>
@@ -60,8 +67,18 @@ const list = computed(() => articles.value ?? [])
   gap: 20px;
 }
 .article-item {
-  display: block;
+  display: flex;
+  gap: 16px;
   color: inherit;
+}
+/* 封面缩略图：有图时横排，无图时 article-body 占满 */
+.article-thumb {
+  width: 132px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  align-self: center;
 }
 .article-item:hover {
   transform: translateY(-4px);
