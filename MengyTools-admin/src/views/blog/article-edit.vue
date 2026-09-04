@@ -2,6 +2,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MdEditor } from 'md-editor-v3'
+import type { ToolbarNames } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 import {
   getArticle,
   createArticle,
@@ -27,6 +30,7 @@ const form = reactive<ArticleForm>({
   title: '',
   summary: '',
   content: '',
+  contentFormat: 'markdown',
   cover: '',
   categoryId: null,
   status: 0,
@@ -39,36 +43,42 @@ const statusOptions = [
   { label: '已发布', value: 1 }
 ]
 
-// Markdown 预览（简易渲染，避免引入额外依赖）
-const preview = computed(() => {
-  let html = form.content || ''
-  // 标题
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
-  // 粗体/斜体
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  // 代码块
-  html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-  // 行内代码
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-  // 图片
-  html = html.replace(/!\[(.*?)\]\((.+?)\)/g, '<img src="$2" alt="$1">')
-  // 链接
-  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>')
-  // 列表
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>')
-  html = html.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-  // 段落
-  html = html
-    .split(/\n\n+/)
-    .map(block =>
-      /^<(h\d|ul|pre|img)/.test(block.trim()) ? block.trim() : `<p>${block.trim()}</p>`
+const formatOptions = [
+  { label: 'Markdown', value: 'markdown' },
+  { label: 'HTML', value: 'html' }
+]
+
+// MdEditor 工具栏配置：保留常用按钮，关闭 mermaid/katex 以减小体积
+const toolbars: ToolbarNames[] = [
+  'bold', 'underline', 'italic', '-',
+  'strikeThrough', 'title', 'sub', 'sup',
+  'quote', 'unorderedList', 'orderedList', '-',
+  'codeRow', 'code', 'link', 'image', 'table', '-',
+  'revoke', 'next', '=', 'pageFullscreen', 'fullscreen', 'preview', 'htmlPreview'
+]
+
+// MdEditor 图片上传：对接后端 FileController，多文件并发上传后回调 URL 数组
+const handleUploadImg = async (
+  files: File[],
+  callback: (urls: string[]) => void
+) => {
+  try {
+    const urls = await Promise.all(
+      files.map(async (f) => {
+        const res = await uploadImage(f)
+        return res.url
+      })
     )
-    .join('\n')
-  return html
-})
+    callback(urls)
+    ElMessage.success(`已上传 ${urls.length} 张图片`)
+  } catch (e) {
+    ElMessage.error('图片上传失败')
+    callback([])
+  }
+}
+
+// HTML 模式预览：直接返回原文走 v-html
+const htmlPreview = computed(() => form.content || '')
 
 const fetchData = async () => {
   loading.value = true
@@ -80,6 +90,7 @@ const fetchData = async () => {
         title: data.title,
         summary: data.summary,
         content: data.content,
+        contentFormat: data.contentFormat || 'markdown',
         cover: data.cover,
         categoryId: data.categoryId,
         status: data.status,
@@ -118,7 +129,7 @@ const handleSubmit = async (status?: number) => {
 
 const handleBack = () => router.push('/blog/article')
 
-// 封面图片上传：成功后回填 URL（支持继续手动填写外链 URL）
+// 封面图片上传：成功后回填 URL
 const fileInput = ref<HTMLInputElement>()
 const uploading = ref(false)
 const triggerUpload = () => fileInput.value?.click()
@@ -145,7 +156,7 @@ onMounted(fetchData)
     <!-- 顶部操作栏 -->
     <el-card shadow="never" class="head-card">
       <div class="head">
-        <el-button @click="handleBack">← 返回</el-button>
+        <el-button @click="handleBack"><el-icon><ArrowLeft /></el-icon> 返回</el-button>
         <span class="head-title">{{ isEdit ? '编辑文章' : '新建文章' }}</span>
         <div class="head-actions">
           <el-button @click="handleSubmit(0)" :loading="submitting">存草稿</el-button>
@@ -202,25 +213,53 @@ onMounted(fetchData)
       </el-form>
     </el-card>
 
-    <!-- Markdown 编辑区 + 预览 -->
+    <!-- 正文编辑区 -->
     <el-card shadow="never" class="editor-card">
       <template #header>
         <div class="card-head">
-          <span>正文（Markdown）</span>
-          <span class="tip">支持 Markdown 语法</span>
+          <div class="head-left">
+            <span class="title-text">正文</span>
+            <el-radio-group v-model="form.contentFormat" size="small">
+              <el-radio-button v-for="o in formatOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-radio-group>
+          </div>
+          <span class="tip">
+            {{ form.contentFormat === 'html' ? 'HTML 模式：直接编写 HTML 源码' : 'Markdown 模式：自带工具栏、代码高亮、双栏预览' }}
+          </span>
         </div>
       </template>
-      <div class="editor-row">
-        <div class="editor-col">
+
+      <!-- Markdown 模式：md-editor-v3 完整编辑器 -->
+      <div v-if="form.contentFormat === 'markdown'" class="md-wrapper">
+        <MdEditor
+          v-model="form.content"
+          :editorId="`article-editor-${id ?? 'new'}`"
+          :toolbars="toolbars"
+          :noMermaid="true"
+          :noKatex="true"
+          :preview="true"
+          :showCodeRowNumber="true"
+          previewTheme="github"
+          codeTheme="github"
+          language="zh-CN"
+          placeholder="在此输入 Markdown 内容..."
+          style="height: 620px"
+          :onUploadImg="handleUploadImg"
+        />
+      </div>
+
+      <!-- HTML 模式：双栏 textarea + 预览 -->
+      <div v-else class="html-editor">
+        <div class="html-col">
           <textarea
             v-model="form.content"
-            class="md-input"
-            placeholder="在此输入 Markdown 内容..."
+            class="html-input"
+            placeholder="在此输入 HTML 源码，如 &lt;h1&gt;标题&lt;/h1&gt;..."
             spellcheck="false"
           />
         </div>
-        <div class="preview-col">
-          <div class="md-preview markdown-body" v-html="preview" />
+        <div class="html-col">
+          <div class="html-preview markdown-body" v-html="htmlPreview" />
         </div>
       </div>
     </el-card>
@@ -254,6 +293,9 @@ onMounted(fetchData)
     display: flex;
     gap: 8px;
     width: 100%;
+    .el-input {
+      flex: 1;
+    }
   }
   .cover-preview {
     margin-top: 8px;
@@ -266,29 +308,41 @@ onMounted(fetchData)
 .editor-card {
   .card-head {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    font-weight: 600;
+    justify-content: space-between;
+    gap: 12px;
+    .head-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .title-text {
+      font-weight: 600;
+    }
     .tip {
       font-size: 12px;
       color: #999;
-      font-weight: normal;
     }
   }
+  .md-wrapper {
+    /* 让 MdEditor 撑满容器 */
+    border-radius: 6px;
+    overflow: hidden;
+  }
 }
-.editor-row {
+/* HTML 模式：双栏布局 */
+.html-editor {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   min-height: 480px;
 }
-.editor-col,
-.preview-col {
+.html-col {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   overflow: hidden;
 }
-.md-input {
+.html-input {
   width: 100%;
   height: 100%;
   min-height: 480px;
@@ -301,7 +355,7 @@ onMounted(fetchData)
   line-height: 1.7;
   background: #fafafa;
 }
-.md-preview {
+.html-preview {
   padding: 16px 20px;
   min-height: 480px;
   overflow-y: auto;
@@ -310,42 +364,49 @@ onMounted(fetchData)
   background: #fff;
 }
 
-/* Markdown 渲染样式（与前台一致） */
-.md-preview :deep(h1),
-.md-preview :deep(h2),
-.md-preview :deep(h3) {
+/* HTML 预览样式（与前台一致） */
+.html-preview :deep(h1),
+.html-preview :deep(h2),
+.html-preview :deep(h3) {
   margin: 1.2em 0 0.6em;
   font-weight: 600;
 }
-.md-preview :deep(h1) { font-size: 22px; }
-.md-preview :deep(h2) { font-size: 19px; }
-.md-preview :deep(h3) { font-size: 17px; }
-.md-preview :deep(p) { margin: 0.6em 0; }
-.md-preview :deep(a) { color: var(--el-color-primary); }
-.md-preview :deep(img) { max-width: 100%; border-radius: 4px; }
-.md-preview :deep(code) {
+.html-preview :deep(h1) { font-size: 22px; }
+.html-preview :deep(h2) { font-size: 19px; }
+.html-preview :deep(h3) { font-size: 17px; }
+.html-preview :deep(p) { margin: 0.6em 0; }
+.html-preview :deep(a) { color: var(--el-color-primary); }
+.html-preview :deep(img) { max-width: 100%; border-radius: 4px; }
+.html-preview :deep(code) {
   background: #f3f4f6;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 13px;
   font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
 }
-.md-preview :deep(pre) {
+.html-preview :deep(pre) {
   background: #1e293b;
   color: #e2e8f0;
   padding: 12px 16px;
   border-radius: 6px;
   overflow-x: auto;
 }
-.md-preview :deep(pre code) {
+.html-preview :deep(pre code) {
   background: transparent;
   padding: 0;
   color: inherit;
 }
-.md-preview :deep(ul) { padding-left: 24px; }
+.html-preview :deep(ul),
+.html-preview :deep(ol) { padding-left: 24px; }
+.html-preview :deep(blockquote) {
+  margin: 0.6em 0;
+  padding: 4px 12px;
+  border-left: 4px solid #dcdfe6;
+  color: #606266;
+}
 
 @media (max-width: 1024px) {
-  .editor-row {
+  .html-editor {
     grid-template-columns: 1fr;
   }
 }

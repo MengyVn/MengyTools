@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useTheme, type ThemeMode } from '~/composables/useTheme'
+import { Sun, Moon, Monitor } from 'lucide-vue-next'
 
 const { mode, setTheme } = useTheme()
 
-const options: Array<{ key: ThemeMode; icon: string; label: string }> = [
-  { key: 'light', icon: '☀️', label: '浅色' },
-  { key: 'dark', icon: '🌙', label: '暗色' },
-  { key: 'system', icon: '💻', label: '跟随系统' }
+const options: Array<{ key: ThemeMode; icon: any; label: string }> = [
+  { key: 'light', icon: Sun, label: '浅色' },
+  { key: 'dark', icon: Moon, label: '暗色' },
+  { key: 'system', icon: Monitor, label: '跟随系统' }
 ]
 </script>
 
@@ -20,7 +21,7 @@ const options: Array<{ key: ThemeMode; icon: string; label: string }> = [
       :title="o.label"
       @click="setTheme(o.key)"
     >
-      <span class="icon">{{ o.icon }}</span>
+      <component :is="o.icon" :size="15" />
     </button>
   </div>
 </template>
@@ -45,15 +46,17 @@ const options: Array<{ key: ThemeMode; icon: string; label: string }> = [
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
+  color: var(--text-secondary);
   line-height: 1;
   transition: all 0.2s;
 }
 .toggle-btn:hover {
   background: var(--bg-color);
+  color: var(--primary);
 }
 .toggle-btn.active {
   background: var(--bg-color);
   box-shadow: var(--shadow-sm);
+  color: var(--primary);
 }
 </style>

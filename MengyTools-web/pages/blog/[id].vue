@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { marked } from 'marked'
+import { Eye, FileQuestion, ArrowLeft } from 'lucide-vue-next'
 
 const route = useRoute()
 const id = route.params.id
@@ -9,6 +10,7 @@ const { data: article } = await useAsyncData(`blog-${id}`, () =>
     id: number
     title: string
     content: string
+    contentFormat: string
     summary: string
     cover: string
     categoryName: string | null
@@ -20,6 +22,9 @@ const { data: article } = await useAsyncData(`blog-${id}`, () =>
 
 const htmlContent = computed(() => {
   if (!article.value?.content) return ''
+  // 兼容旧数据：未标注格式的默认当 markdown 处理
+  const fmt = article.value.contentFormat || 'markdown'
+  if (fmt === 'html') return article.value.content
   try {
     return marked.parse(article.value.content, { async: false }) as string
   } catch {
@@ -33,10 +38,22 @@ const visitorId = useCookie<string | undefined>('visitor_id', {
   maxAge: 60 * 60 * 24 * 365,
   sameSite: 'lax'
 })
+// 生成访客 ID：crypto.randomUUID 在非 HTTPS（http://localhost）下不可用，需兼容回退
+const genVisitorId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // 回退：手动拼 UUID v4
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
 onMounted(() => {
   if (!article.value) return
   if (!visitorId.value) {
-    visitorId.value = crypto.randomUUID()
+    visitorId.value = genVisitorId()
   }
   api
     .post<boolean>('/v1/track/view', {
@@ -61,30 +78,31 @@ useSeoMeta({
 <template>
   <div class="container">
     <article v-if="article" class="card article">
-      <div class="article-head">
+      <div class="article-head animate-fade-up">
         <div class="article-meta">
           <span v-if="article.categoryName" class="tag">{{ article.categoryName }}</span>
           <span class="time">{{ (article.publishTime || article.createTime || '').slice(0, 10) }}</span>
-          <span v-if="article.viewCount" class="views">👁 {{ article.viewCount }} 阅读</span>
+          <span v-if="article.viewCount" class="views"><Eye :size="14" /> {{ article.viewCount }} 阅读</span>
         </div>
         <h1 class="article-title">{{ article.title }}</h1>
         <p v-if="article.summary" class="article-summary">{{ article.summary }}</p>
       </div>
 
       <!-- 封面图 -->
-      <img
-        v-if="article.cover"
-        :src="article.cover"
-        :alt="article.title"
-        class="article-cover"
-      />
+      <div v-if="article.cover" class="zoom-wrap article-cover-wrap animate-fade-up delay-1">
+        <img
+          :src="article.cover"
+          :alt="article.title"
+          class="article-cover"
+        />
+      </div>
 
-      <div class="article-content markdown-body" v-html="htmlContent" />
+      <div class="article-content markdown-body animate-fade-up delay-2" v-html="htmlContent" />
     </article>
     <div v-else class="empty-state card">
-      <div class="emoji">📄</div>
+      <FileQuestion :size="40" class="empty-icon" />
       <p>文章不存在或已被删除</p>
-      <NuxtLink to="/blog" class="back-link">← 返回博客列表</NuxtLink>
+      <NuxtLink to="/blog" class="back-link"><ArrowLeft :size="14" /> 返回博客列表</NuxtLink>
     </div>
   </div>
 </template>
@@ -116,6 +134,11 @@ useSeoMeta({
 .views {
   color: var(--text-tertiary);
 }
+.views {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .article-title {
   margin: 0 0 12px;
   font-size: 30px;
@@ -129,14 +152,18 @@ useSeoMeta({
   line-height: 1.7;
 }
 
-/* 封面图 */
+/* 封面图：外层裁剪容器 + 内层图片 hover 缩放 */
+.article-cover-wrap {
+  width: 100%;
+  max-height: 420px;
+  margin-bottom: 24px;
+  border-radius: var(--radius);
+}
 .article-cover {
   display: block;
   width: 100%;
   max-height: 420px;
   object-fit: cover;
-  border-radius: var(--radius);
-  margin-bottom: 24px;
 }
 
 /* Markdown 渲染样式 */
@@ -215,7 +242,9 @@ useSeoMeta({
 }
 
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 16px;
   font-size: 14px;
   font-weight: 500;

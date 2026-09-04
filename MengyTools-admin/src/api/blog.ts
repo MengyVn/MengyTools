@@ -20,6 +20,8 @@ export interface ArticleDetail {
   title: string
   summary: string
   content: string
+  /** 内容格式 markdown / html */
+  contentFormat: string
   cover: string
   categoryId: number | null
   categoryName: string | null
@@ -34,6 +36,7 @@ export interface ArticleForm {
   title: string
   summary: string
   content: string
+  contentFormat: string
   cover: string
   categoryId: number | null
   status: number
@@ -75,6 +78,18 @@ export const updateArticle = (id: number, data: ArticleForm) =>
 // 删除
 export const deleteArticle = (id: number) =>
   request.delete<unknown, void>(`/v1/admin/articles/${id}`)
+
+// 回收站列表（已逻辑删除的文章）
+export const listTrashArticles = (params: ArticleQuery) =>
+  request.get<unknown, PageResult<ArticleListItem>>('/v1/admin/articles/trash', { params })
+
+// 批量恢复
+export const restoreArticles = (ids: number[]) =>
+  request.put<unknown, void>('/v1/admin/articles/restore', { ids })
+
+// 批量物理删除
+export const hardDeleteArticles = (ids: number[]) =>
+  request.delete<unknown, void>('/v1/admin/articles/hard', { data: { ids } })
 
 // 切换置顶
 export const toggleArticleTop = (id: number, top: boolean) =>

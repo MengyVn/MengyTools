@@ -6,6 +6,9 @@ import {
   listArticles,
   deleteArticle,
   toggleArticleTop,
+  listTrashArticles,
+  restoreArticles,
+  hardDeleteArticles,
   type ArticleListItem,
   type ArticleQuery
 } from '@/api/blog'
@@ -71,6 +74,70 @@ const handleToggleTop = async (row: ArticleListItem) => {
   fetchList()
 }
 
+// ============== 回收站 ==============
+const trashVisible = ref(false)
+const trashLoading = ref(false)
+const trashList = ref<ArticleListItem[]>([])
+const trashTotal = ref(0)
+const trashSelection = ref<ArticleListItem[]>([])
+const trashQuery = reactive<ArticleQuery>({ page: 1, size: 10, title: '' })
+
+const openTrash = () => {
+  trashVisible.value = true
+  trashQuery.page = 1
+  trashQuery.title = ''
+  fetchTrash()
+}
+
+const fetchTrash = async () => {
+  trashLoading.value = true
+  try {
+    const res = await listTrashArticles({ ...trashQuery })
+    trashList.value = res.records
+    trashTotal.value = res.total
+  } finally {
+    trashLoading.value = false
+  }
+}
+
+const onTrashSelectionChange = (rows: ArticleListItem[]) => {
+  trashSelection.value = rows
+}
+
+const handleRestore = async () => {
+  const ids = trashSelection.value.map(a => a.id)
+  await ElMessageBox.confirm(
+    `确定恢复选中的 ${ids.length} 篇文章吗？恢复后可在文章列表中查看。`,
+    '恢复确认',
+    { type: 'warning' }
+  )
+  await restoreArticles(ids)
+  ElMessage.success('已恢复')
+  trashQuery.page = 1
+  fetchTrash()
+  fetchList()
+}
+
+const handleHardDelete = async () => {
+  const ids = trashSelection.value.map(a => a.id)
+  await ElMessageBox.confirm(
+    `确定彻底删除选中的 ${ids.length} 篇文章吗？\n\n此操作不可恢复，文章将永久删除，无法再恢复！`,
+    '彻底删除确认',
+    { type: 'error', confirmButtonText: '确认彻底删除', cancelButtonText: '取消' }
+  )
+  await hardDeleteArticles(ids)
+  ElMessage.success('已彻底删除')
+  trashQuery.page = 1
+  fetchTrash()
+  fetchList()
+}
+
+const handleTrashClosed = () => {
+  trashSelection.value = []
+  trashList.value = []
+  trashTotal.value = 0
+}
+
 onMounted(fetchList)
 </script>
 
@@ -99,7 +166,10 @@ onMounted(fetchList)
       <template #header>
         <div class="card-head">
           <span>文章列表</span>
-          <el-button type="primary" @click="handleCreate">+ 新建文章</el-button>
+          <div class="head-actions">
+            <el-button @click="openTrash">回收站</el-button>
+            <el-button type="primary" @click="handleCreate">+ 新建文章</el-button>
+          </div>
         </div>
       </template>
 
@@ -150,6 +220,90 @@ onMounted(fetchList)
         />
       </div>
     </el-card>
+
+    <!-- 回收站弹窗 -->
+    <el-dialog
+      v-model="trashVisible"
+      title="回收站 - 已删除的文章"
+      width="820px"
+      :close-on-click-modal="false"
+      @closed="handleTrashClosed"
+    >
+      <div class="trash-toolbar">
+        <el-input
+          v-model="trashQuery.title"
+          placeholder="按标题搜索"
+          clearable
+          style="width: 220px"
+          @keyup.enter="fetchTrash"
+        />
+        <el-button @click="fetchTrash">查询</el-button>
+        <span class="trash-tip" v-if="trashSelection.length">
+          已选 {{ trashSelection.length }} 篇
+        </span>
+      </div>
+      <el-table
+        v-loading="trashLoading"
+        :data="trashList"
+        stripe
+        max-height="420"
+        @selection-change="onTrashSelectionChange"
+      >
+        <el-table-column type="selection" width="44" />
+        <el-table-column label="标题" min-width="220">
+          <template #default="{ row }">
+            <span class="title-cell">
+              <el-tag v-if="row.isTop" type="danger" size="small" effect="dark">置顶</el-tag>
+              {{ row.title }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="分类" width="120">
+          <template #default="{ row }">{{ row.categoryName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag :type="statusTag(row.status).type as any" size="small">
+              {{ statusTag(row.status).text }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="160">
+          <template #default="{ row }">{{ row.createTime?.replace('T', ' ').slice(0, 16) || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <div class="trash-pager">
+        <el-pagination
+          v-model:current-page="trashQuery.page"
+          v-model:page-size="trashQuery.size"
+          :total="trashTotal"
+          :page-sizes="[10, 20, 50]"
+          layout="total, prev, pager, next"
+          background
+          @size-change="fetchTrash"
+          @current-change="fetchTrash"
+        />
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button
+            type="success"
+            :disabled="trashSelection.length === 0"
+            @click="handleRestore"
+          >
+            恢复选中 ({{ trashSelection.length }})
+          </el-button>
+          <el-button
+            type="danger"
+            :disabled="trashSelection.length === 0"
+            @click="handleHardDelete"
+          >
+            彻底删除 ({{ trashSelection.length }})
+          </el-button>
+          <el-button @click="trashVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -176,6 +330,26 @@ onMounted(fetchList)
 }
 .pager {
   margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+.head-actions {
+  display: flex;
+  gap: 8px;
+}
+.trash-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  .trash-tip {
+    margin-left: auto;
+    color: var(--el-color-primary);
+    font-size: 13px;
+  }
+}
+.trash-pager {
+  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
 }

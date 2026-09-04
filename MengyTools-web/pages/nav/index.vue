@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Search, ArrowUpRight, Compass } from 'lucide-vue-next'
 const { data: categories } = await useAsyncData('nav-list', () =>
   useApi().get<Array<{
     id: number
@@ -43,20 +44,21 @@ const initial = (name: string) => (name || '?').charAt(0)
 
 <template>
   <div class="container">
-    <h1 class="page-title">网址导航</h1>
-    <p class="page-subtitle">精选网址 · 多级分类</p>
+    <h1 class="page-title animate-fade-up">网址导航</h1>
+    <p class="page-subtitle animate-fade-up delay-1">精选网址 · 多级分类</p>
 
-    <div class="search-bar">
+    <div class="search-bar animate-fade-up delay-2">
+      <Search :size="16" class="search-icon" />
       <input
         v-model="keyword"
         type="text"
-        placeholder="🔍 搜索站点名称、网址或描述..."
+        placeholder="搜索站点名称、网址或描述..."
         class="search-input"
       >
     </div>
 
     <div v-if="filtered.length">
-      <section v-for="cat in filtered" :key="cat.id" class="cat-block">
+      <section v-for="(cat, ci) in filtered" :key="cat.id" v-reveal="{ delay: Math.min(ci, 6) * 80 }" class="cat-block">
         <h2 class="cat-title">
           <span class="cat-bar"></span>
           {{ cat.name }}
@@ -78,13 +80,13 @@ const initial = (name: string) => (name || '?').charAt(0)
               <span class="site-name">{{ site.name }}</span>
               <span class="site-desc">{{ site.description || site.url }}</span>
             </div>
-            <span class="site-arrow">↗</span>
+            <span class="site-arrow"><ArrowUpRight :size="16" /></span>
           </a>
         </div>
       </section>
     </div>
     <div v-else class="empty-state card">
-      <div class="emoji">🧭</div>
+      <Compass :size="40" class="empty-icon" />
       <p>{{ keyword ? '没有匹配的站点' : '暂无导航数据' }}</p>
     </div>
   </div>
@@ -92,11 +94,20 @@ const initial = (name: string) => (name || '?').charAt(0)
 
 <style scoped>
 .search-bar {
+  position: relative;
   margin-bottom: 32px;
+}
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
 }
 .search-input {
   width: 100%;
-  padding: 12px 18px;
+  padding: 12px 18px 12px 42px;
   font-size: 15px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
@@ -188,7 +199,7 @@ const initial = (name: string) => (name || '?').charAt(0)
 }
 .site-arrow {
   color: var(--text-tertiary);
-  font-size: 16px;
+  display: inline-flex;
   opacity: 0;
   transition: opacity 0.2s, transform 0.2s;
 }

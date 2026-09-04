@@ -30,6 +30,9 @@ public class BlogArticle implements Serializable {
     /** 渲染后 HTML（可选缓存，公开列表不返回此字段） */
     private String contentHtml;
 
+    /** 内容格式：markdown / html，默认 markdown */
+    private String contentFormat;
+
     private String cover;
 
     private Long categoryId;

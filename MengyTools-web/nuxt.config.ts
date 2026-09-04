@@ -29,11 +29,15 @@ export default defineNuxtConfig({
           innerHTML: `(function(){try{var t=localStorage.getItem('theme')||'system';var d=t==='system'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;document.documentElement.setAttribute('data-theme',d);}catch(e){}})();`,
           tagPosition: 'head'
         }
+      ],
+      // JS 禁用时让滚动渐入元素直接可见，避免内容隐藏
+      noscript: [
+        { innerHTML: '<style>.reveal{opacity:1!important;transform:none!important}</style>' }
       ]
     }
   },
 
-  css: ['~/assets/css/main.css'],
+  css: ['~/assets/css/main.css', '~/assets/css/animations.css'],
 
   runtimeConfig: {
     // 后端 API 地址：服务端渲染走内网，浏览器走公网

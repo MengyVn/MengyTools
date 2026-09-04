@@ -1,0 +1,130 @@
+/* =====================================================================
+   MengyTools 门户动效系统
+   原则：只动 transform / opacity（GPU 合成），不触发 layout/paint；
+   用 IntersectionObserver 触发滚动动画，避免 scroll 监听；
+   缓动统一用 cubic-bezier(0.22, 1, 0.36, 1)（easeOutQuint 风格，顺滑高级）。
+   ===================================================================== */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------- 滚动渐入（v-reveal 指令） ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-y, 24px));
+  transition:
+    opacity 0.7s var(--ease-out),
+    transform 0.7s var(--ease-out);
+  will-change: opacity, transform;
+}
+.reveal.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* 动画结束后移除 will-change，避免长期占用合成层 */
+.reveal.reveal-visible {
+  animation: reveal-cleanup 0.1s 0.8s forwards;
+}
+@keyframes reveal-cleanup {
+  to { will-change: auto; }
+}
+
+/* ---------- 首屏入场（Hero，纯 CSS 动画，无需 JS） ---------- */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-up {
+  opacity: 0;
+  animation: fade-up 0.8s var(--ease-out) forwards;
+}
+.animate-fade-in {
+  opacity: 0;
+  animation: fade-in 0.8s var(--ease-out) forwards;
+}
+/* 入场延迟工具类（stagger） */
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+
+/* ---------- Hero 背景光斑缓慢漂浮 ---------- */
+@keyframes blob-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -24px) scale(1.08); }
+  66%      { transform: translate(-20px, 20px) scale(0.96); }
+}
+@keyframes blob-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-36px, 20px) scale(1.1); }
+}
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+.hero-blob-1 {
+  width: 420px; height: 420px;
+  top: -80px; left: -60px;
+  background: radial-gradient(circle, rgba(99,102,241,0.35), transparent 70%);
+  animation: blob-float-1 14s var(--ease-in-out) infinite;
+}
+.hero-blob-2 {
+  width: 380px; height: 380px;
+  bottom: -80px; right: -40px;
+  background: radial-gradient(circle, rgba(236,72,153,0.28), transparent 70%);
+  animation: blob-float-2 18s var(--ease-in-out) infinite;
+}
+
+/* ---------- 图片 hover 缩放容器（外层裁剪，内层 scale，避免与卡片 transform 冲突） ---------- */
+.zoom-wrap {
+  overflow: hidden;
+  border-radius: 8px;
+}
+.zoom-wrap > img {
+  transition: transform 0.6s var(--ease-out);
+}
+.zoom-wrap:hover > img {
+  transform: scale(1.08);
+}
+
+/* ---------- 页面切换过渡（NuxtPage） ---------- */
+.page-enter-active {
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
+.page-leave-active {
+  transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ---------- 减少动态偏好：尊重系统设置，关闭非必要动画 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -135,6 +135,9 @@ public class ArticleAdminController {
         if (article.getViewCount() == null) {
             article.setViewCount(0L);
         }
+        if (article.getContentFormat() == null || article.getContentFormat().isBlank()) {
+            article.setContentFormat("markdown");
+        }
         articleMapper.insert(article);
         return Result.ok(article.getId());
     }
@@ -152,6 +155,10 @@ public class ArticleAdminController {
         BlogArticle article = new BlogArticle();
         BeanUtils.copyProperties(dto, article);
         article.setId(id);
+        // 兼容旧数据：未传 format 时回退为 markdown
+        if (article.getContentFormat() == null || article.getContentFormat().isBlank()) {
+            article.setContentFormat("markdown");
+        }
         // 状态从草稿改为已发布时补 publishTime
         if (dto.getStatus() != null && dto.getStatus() == 1
                 && exists.getStatus() != null && exists.getStatus() != 1
@@ -169,6 +176,49 @@ public class ArticleAdminController {
     @PreAuthorize("@ss.hasPermi('article:delete')")
     public Result<Void> delete(@PathVariable Long id) {
         articleMapper.deleteById(id);
+        return Result.ok();
+    }
+
+    /**
+     * 回收站分页列表（仅查已逻辑删除的文章）。
+     */
+    @GetMapping("/trash")
+    @PreAuthorize("@ss.hasPermi('article:delete')")
+    public Result<IPage<ArticleListItemDTO>> trash(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String title) {
+        Page<ArticleListItemDTO> p = new Page<>(page, size);
+        return Result.ok(articleMapper.selectTrashPage(p, title));
+    }
+
+    /**
+     * 批量恢复文章（把 deleted 改回 0）。
+     */
+    @PutMapping("/restore")
+    @PreAuthorize("@ss.hasPermi('article:delete')")
+    public Result<Void> restore(@RequestBody IdsDTO dto) {
+        if (dto.getIds() == null || dto.getIds().isEmpty()) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "请选择要恢复的文章");
+        }
+        for (Long id : dto.getIds()) {
+            articleMapper.restore(id);
+        }
+        return Result.ok();
+    }
+
+    /**
+     * 批量物理删除（不可恢复，二次确认在前端完成）。
+     */
+    @DeleteMapping("/hard")
+    @PreAuthorize("@ss.hasPermi('article:delete')")
+    public Result<Void> hardDelete(@RequestBody IdsDTO dto) {
+        if (dto.getIds() == null || dto.getIds().isEmpty()) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "请选择要删除的文章");
+        }
+        for (Long id : dto.getIds()) {
+            articleMapper.hardDelete(id);
+        }
         return Result.ok();
     }
 
@@ -193,6 +243,8 @@ public class ArticleAdminController {
         private String title;
         private String summary;
         private String content;
+        /** 内容格式：markdown / html，默认 markdown */
+        private String contentFormat;
         private String cover;
         private Long categoryId;
         /** 0草稿 1已发布 2定时发布 */
@@ -201,5 +253,13 @@ public class ArticleAdminController {
         /** 前端回传格式与详情接口一致（yyyy-MM-dd HH:mm:ss），必须注解否则 Jackson 按 ISO 解析报 500 */
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         private LocalDateTime publishTime;
+    }
+
+    /**
+     * 批量操作 ID 列表请求体（回收站批量恢复/硬删除）。
+     */
+    @lombok.Data
+    public static class IdsDTO {
+        private java.util.List<Long> ids;
     }
 }

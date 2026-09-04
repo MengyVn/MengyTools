@@ -112,7 +112,10 @@ img {
   border-radius: var(--radius);
   padding: 20px;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.25s, transform 0.25s, border-color 0.25s;
+  transition:
+    box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* 页面标题 */
@@ -134,10 +137,10 @@ img {
   padding: 80px 20px;
   color: var(--text-tertiary);
 }
-.empty-state .emoji {
-  font-size: 48px;
-  margin-bottom: 12px;
-  opacity: 0.5;
+.empty-state .empty-icon {
+  margin: 0 auto 12px;
+  display: block;
+  opacity: 0.4;
 }
 
 /* 渐变文字 */

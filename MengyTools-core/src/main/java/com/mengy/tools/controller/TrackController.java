@@ -1,6 +1,7 @@
 package com.mengy.tools.controller;
 
 import com.mengy.tools.common.Result;
+import com.mengy.tools.mapper.AnnouncementMapper;
 import com.mengy.tools.mapper.BlogArticleMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -25,12 +26,19 @@ public class TrackController {
 
     private final StringRedisTemplate redisTemplate;
     private final BlogArticleMapper articleMapper;
+    private final AnnouncementMapper announcementMapper;
 
     private static final Duration DEDUP_TTL = Duration.ofHours(24);
 
     @Data
     public static class ViewDTO {
         private Long articleId;
+        private String visitorId;
+    }
+
+    @Data
+    public static class AnnouncementViewDTO {
+        private Long announcementId;
         private String visitorId;
     }
 
@@ -46,6 +54,24 @@ public class TrackController {
                 "view:art:" + dto.getArticleId() + ":" + dto.getVisitorId(), "1", DEDUP_TTL);
         if (Boolean.TRUE.equals(first)) {
             articleMapper.incrementViewCount(dto.getArticleId());
+            return Result.ok(true);
+        }
+        return Result.ok(false);
+    }
+
+    /**
+     * 公告浏览上报。返回 true 表示本次有效计数（24h 首次），false 表示重复访问。
+     * 以「公告 + 访客ID」为粒度 24 小时去重，逻辑与文章浏览一致。
+     */
+    @PostMapping("/announcement/view")
+    public Result<Boolean> announcementView(@RequestBody AnnouncementViewDTO dto) {
+        if (dto.getAnnouncementId() == null || dto.getVisitorId() == null || dto.getVisitorId().isBlank()) {
+            return Result.ok(false);
+        }
+        Boolean first = redisTemplate.opsForValue().setIfAbsent(
+                "view:ann:" + dto.getAnnouncementId() + ":" + dto.getVisitorId(), "1", DEDUP_TTL);
+        if (Boolean.TRUE.equals(first)) {
+            announcementMapper.incrementViewCount(dto.getAnnouncementId());
             return Result.ok(true);
         }
         return Result.ok(false);

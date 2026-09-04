@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Wrench, ArrowUpRight } from 'lucide-vue-next'
 const { data: tools } = await useAsyncData('tools-list', () =>
   useApi().get<Array<{
     id: number
@@ -20,28 +21,29 @@ const list = computed(() => tools.value ?? [])
 
 <template>
   <div class="container">
-    <h1 class="page-title">效率工具</h1>
-    <p class="page-subtitle">常用工具卡片 · 即开即用</p>
+    <h1 class="page-title animate-fade-up">效率工具</h1>
+    <p class="page-subtitle animate-fade-up delay-1">常用工具卡片 · 即开即用</p>
 
     <div v-if="list.length" class="grid">
       <a
-        v-for="t in list"
+        v-for="(t, i) in list"
         :key="t.id"
+        v-reveal="{ delay: Math.min(i, 8) * 50 }"
         :href="t.link || t.componentRoute"
         target="_blank"
         rel="noopener noreferrer"
         class="card tool-card"
       >
-        <div class="tool-icon">{{ t.icon || '🛠️' }}</div>
+        <div class="tool-icon"><Wrench :size="22" /></div>
         <div class="tool-body">
           <h3>{{ t.name }}</h3>
           <p>{{ t.description || '暂无描述' }}</p>
         </div>
-        <span class="tool-arrow">↗</span>
+        <span class="tool-arrow"><ArrowUpRight :size="16" /></span>
       </a>
     </div>
     <div v-else class="empty-state card">
-      <div class="emoji">🛠️</div>
+      <Wrench :size="40" class="empty-icon" />
       <p>暂无工具</p>
     </div>
   </div>
@@ -102,7 +104,7 @@ const list = computed(() => tools.value ?? [])
   top: 22px;
   right: 22px;
   color: var(--text-tertiary);
-  font-size: 16px;
+  display: inline-flex;
   opacity: 0;
   transition: opacity 0.2s, transform 0.2s;
 }

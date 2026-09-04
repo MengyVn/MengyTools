@@ -123,6 +123,7 @@ CREATE TABLE `blog_article` (
   `summary`      varchar(500) NOT NULL DEFAULT '' COMMENT '摘要',
   `content`      longtext     COMMENT 'Markdown 内容(原文存储，前端解析)',
   `content_html` longtext     COMMENT '渲染后 HTML(可选缓存)',
+  `content_format` varchar(20) NOT NULL DEFAULT 'markdown' COMMENT '内容格式: markdown / html',
   `cover`        varchar(255) NOT NULL DEFAULT '' COMMENT '封面URL',
   `category_id`  bigint       DEFAULT NULL COMMENT '分类ID',
   `status`       tinyint      NOT NULL DEFAULT 0 COMMENT '状态:0草稿 1已发布 2定时发布',

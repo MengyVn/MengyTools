@@ -26,6 +26,7 @@ const navLinks = [
           </NuxtLink>
         </nav>
         <div class="header-right">
+          <AnnouncementBell />
           <ThemeToggle />
         </div>
       </div>

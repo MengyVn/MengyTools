@@ -20,6 +20,9 @@ public class ArticleDetailDTO implements Serializable {
 
     private String content;
 
+    /** 内容格式：markdown / html，默认 markdown */
+    private String contentFormat;
+
     private String cover;
 
     private Long categoryId;
