@@ -32,12 +32,19 @@ public class AnnouncementPortalController {
     private final AnnouncementMapper announcementMapper;
 
     /**
-     * 当前生效公告（常驻优先、发布时间倒序）。
-     * 常驻公告永不消失；非常驻公告需未过 expire_time。
+     * 当前生效公告（铃铛下拉用，返回所有已发布且已到发布时间的公告，不再按 expire_time 过滤）。
      */
     @GetMapping("/active")
     public Result<List<AnnouncementListItemDTO>> active() {
         return Result.ok(announcementMapper.selectActiveList());
+    }
+
+    /**
+     * 跑马灯公告（首页顶部滚动条用，返回 is_marquee=1 且已发布的公告）。
+     */
+    @GetMapping("/marquee")
+    public Result<List<AnnouncementListItemDTO>> marquee() {
+        return Result.ok(announcementMapper.selectMarqueeList());
     }
 
     /**

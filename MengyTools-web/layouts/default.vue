@@ -28,9 +28,12 @@ const navLinks = [
         <div class="header-right">
           <AnnouncementBell />
           <ThemeToggle />
+          <UserMenu />
         </div>
       </div>
     </header>
+
+    <MarqueeBar />
 
     <main class="site-main">
       <slot />
@@ -74,6 +77,7 @@ const navLinks = [
 .header-right {
   display: flex;
   align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
 .logo {

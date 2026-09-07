@@ -50,6 +50,7 @@ public class AnnouncementAdminController {
             @RequestParam(required = false) Integer status) {
         Page<Announcement> p = new Page<>(page, size);
         LambdaQueryWrapper<Announcement> wrapper = new LambdaQueryWrapper<Announcement>()
+                .orderByDesc(Announcement::getIsMarquee)
                 .orderByDesc(Announcement::getIsPersistent)
                 .orderByDesc(Announcement::getPublishTime)
                 .orderByDesc(Announcement::getCreateTime);
@@ -128,7 +129,9 @@ public class AnnouncementAdminController {
      * 公告创建/编辑统一规范化逻辑：
      * - contentFormat 缺省回退 markdown
      * - status 缺省回退 0(草稿)
-     * - 常驻公告强制 expireTime=null
+     * - isPersistent 缺省回退 0
+     * - isMarquee 缺省回退 0
+     * - displayDuration 缺省回退 0；非跑马灯时强制 0
      * - status=1 且 publishTime 为空 → 立即发布(补 publishTime=now)
      * - status=1 且 publishTime 在未来 → 自动改为 2(定时中)
      * - viewCount 缺省回退 0
@@ -143,12 +146,18 @@ public class AnnouncementAdminController {
         if (ann.getIsPersistent() == null) {
             ann.setIsPersistent(0);
         }
+        if (ann.getIsMarquee() == null) {
+            ann.setIsMarquee(0);
+        }
+        if (ann.getDisplayDuration() == null) {
+            ann.setDisplayDuration(0);
+        }
+        // 非跑马灯公告，displayDuration 无意义
+        if (ann.getIsMarquee() != 1) {
+            ann.setDisplayDuration(0);
+        }
         if (ann.getViewCount() == null) {
             ann.setViewCount(0);
-        }
-        // 常驻公告永不消失
-        if (ann.getIsPersistent() == 1) {
-            ann.setExpireTime(null);
         }
         // 已发布且未指定发布时间 → 立即发布
         if (ann.getStatus() == 1 && ann.getPublishTime() == null) {
@@ -171,8 +180,12 @@ public class AnnouncementAdminController {
         private String content;
         /** 内容格式：markdown / html，默认 markdown */
         private String contentFormat;
-        /** 是否常驻：1常驻(永不消失) 0非常驻 */
+        /** 是否常驻：1常驻(每次登录都弹出) 0非常驻(关闭后跨登录保持) */
         private Integer isPersistent;
+        /** 是否滚动出现在首页顶部跑马灯：1是 0否 */
+        private Integer isMarquee;
+        /** 跑马灯显示时长(分钟)：0/null=一直显示直到手动关闭 */
+        private Integer displayDuration;
         /** 0草稿 1已发布 2定时中 3已下线 */
         private Integer status;
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

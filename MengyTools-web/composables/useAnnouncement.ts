@@ -9,6 +9,10 @@ export interface AnnouncementItem {
   title: string
   contentFormat: string
   isPersistent: number
+  /** 是否滚动出现在首页顶部跑马灯：1是 0否 */
+  isMarquee: number
+  /** 跑马灯显示时长(分钟)：0=一直显示直到手动关闭 */
+  displayDuration: number
   publishTime: string | null
   expireTime: string | null
   status: number
@@ -31,9 +35,12 @@ export const useAnnouncement = () => {
   const api = useApi()
 
   return {
-    /** 当前生效公告（含非常驻 + 常驻） */
+    /** 当前生效公告（铃铛下拉用，所有已发布且已到发布时间） */
     fetchActive: () =>
       api.get<AnnouncementItem[]>('/v1/portal/announcements/active'),
+    /** 跑马灯公告（首页顶部滚动条用，is_marquee=1 的已发布公告） */
+    fetchMarquee: () =>
+      api.get<AnnouncementItem[]>('/v1/portal/announcements/marquee'),
     /** 历史公告分页 */
     fetchPage: (page = 1, size = 10) =>
       api.get<AnnouncementPage>('/v1/portal/announcements', {

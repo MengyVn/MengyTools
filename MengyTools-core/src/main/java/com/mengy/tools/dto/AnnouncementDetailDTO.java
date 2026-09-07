@@ -25,6 +25,12 @@ public class AnnouncementDetailDTO implements Serializable {
     /** 是否常驻：1常驻 0非常驻 */
     private Integer isPersistent;
 
+    /** 是否滚动出现在首页顶部跑马灯：1是 0否 */
+    private Integer isMarquee;
+
+    /** 跑马灯显示时长(分钟)：0/null=一直显示直到用户手动关闭 */
+    private Integer displayDuration;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime publishTime;
 

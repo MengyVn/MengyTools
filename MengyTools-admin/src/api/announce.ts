@@ -9,6 +9,10 @@ export interface AnnouncementItem {
   contentFormat: string
   /** 1常驻 0非常驻 */
   isPersistent: number
+  /** 是否滚动出现在首页顶部跑马灯：1是 0否 */
+  isMarquee: number
+  /** 跑马灯显示时长(分钟)：0=一直显示直到手动关闭 */
+  displayDuration: number
   /** 'yyyy-MM-dd HH:mm:ss' 或 null */
   publishTime: string | null
   expireTime: string | null
@@ -28,6 +32,10 @@ export interface AnnouncementForm {
   contentFormat: 'markdown' | 'html'
   /** 0 或 1 */
   isPersistent: number
+  /** 是否滚动出现在首页顶部跑马灯：1是 0否 */
+  isMarquee: number
+  /** 跑马灯显示时长(分钟)：0=一直显示直到手动关闭 */
+  displayDuration: number
   publishTime: string | null
   expireTime: string | null
   status: number

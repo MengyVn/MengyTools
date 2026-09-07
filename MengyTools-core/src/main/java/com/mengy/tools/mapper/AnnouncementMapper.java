@@ -18,26 +18,37 @@ import java.util.List;
 public interface AnnouncementMapper extends BaseMapper<Announcement> {
 
     /**
-     * 当前生效公告（status=1 且未删除 且已到发布时间 且未消失）。
-     * 常驻公告(is_persistent=1) 永不消失；非常驻公告需 expire_time > NOW()。
-     * 常驻优先、发布时间倒序。
+     * 当前生效公告（铃铛下拉用，status=1 且已到发布时间，不再按 expire_time 过滤）。
+     * 跑马灯优先、常驻优先、发布时间倒序。
      */
     @Select("""
-        SELECT id, title, content_format, is_persistent,
+        SELECT id, title, content_format, is_persistent, is_marquee, display_duration,
                publish_time, expire_time, status, view_count, create_time
         FROM announcement
         WHERE deleted = 0 AND status = 1
           AND (publish_time IS NULL OR publish_time <= NOW())
-          AND (is_persistent = 1 OR (expire_time IS NOT NULL AND expire_time > NOW()))
-        ORDER BY is_persistent DESC, publish_time DESC
+        ORDER BY is_marquee DESC, is_persistent DESC, publish_time DESC
         """)
     List<AnnouncementListItemDTO> selectActiveList();
+
+    /**
+     * 跑马灯公告（is_marquee=1 且 status=1 且已到发布时间）。
+     */
+    @Select("""
+        SELECT id, title, content_format, is_persistent, is_marquee, display_duration,
+               publish_time, expire_time, status, view_count, create_time
+        FROM announcement
+        WHERE deleted = 0 AND status = 1 AND is_marquee = 1
+          AND (publish_time IS NULL OR publish_time <= NOW())
+        ORDER BY is_persistent DESC, publish_time DESC
+        """)
+    List<AnnouncementListItemDTO> selectMarqueeList();
 
     /**
      * 历史公告分页（status=1 且已到发布时间，按 publish_time 倒序，不含 content）。
      */
     @Select("""
-        SELECT id, title, content_format, is_persistent,
+        SELECT id, title, content_format, is_persistent, is_marquee, display_duration,
                publish_time, expire_time, status, view_count, create_time
         FROM announcement
         WHERE deleted = 0 AND status = 1

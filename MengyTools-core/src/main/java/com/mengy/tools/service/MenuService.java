@@ -46,7 +46,7 @@ public class MenuService {
     }
 
     /**
-     * 菜单管理全量树（含 F 按钮权限节点）。
+     * 菜单管理全量树（含 F 按钮权限节点）
      */
     public List<MenuTreeNode> getAllMenuTree() {
         return buildTree(menuMapper.selectAllMenus());

@@ -29,8 +29,14 @@ public class Announcement implements Serializable {
     /** 内容格式：markdown / html，默认 markdown */
     private String contentFormat;
 
-    /** 是否常驻：1常驻(永不消失) 0非常驻 */
+    /** 是否常驻：1常驻(每次登录都弹出,关闭态存sessionStorage) 0非常驻(关闭后跨登录保持,存localStorage) */
     private Integer isPersistent;
+
+    /** 是否滚动出现在首页顶部跑马灯：1是 0否 */
+    private Integer isMarquee;
+
+    /** 跑马灯显示时长(分钟)：0/null=一直显示直到用户手动关闭 */
+    private Integer displayDuration;
 
     /** 定时发布时间，NULL=立即发布 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

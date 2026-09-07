@@ -11,34 +11,9 @@ const loading = ref(false)
 const items = ref<AnnouncementItem[]>([])
 const error = ref<string | null>(null)
 
-/** 进度条 tick 触发器：每 30s 自增以驱动 recompute */
-const nowTick = ref(Date.now())
-let progressTimer: ReturnType<typeof setInterval> | null = null
-
 /** 已读标记：存储最近一次打开下拉时见到的最大 publishTime 毫秒值 */
 const LAST_READ_KEY = 'announcement-last-read-ms'
 const hasUnread = ref(false)
-
-/** 计算单条非常驻公告的进度百分比（0~100），防御性处理 null 时间 */
-const progressOf = (item: AnnouncementItem): number => {
-  if (item.isPersistent === 1) return 0
-  const start = item.publishTime ? Date.parse(item.publishTime) : NaN
-  const end = item.expireTime ? Date.parse(item.expireTime) : NaN
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0
-  const now = nowTick.value
-  if (now <= start) return 0
-  if (now >= end) return 100
-  return Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100))
-}
-
-/** 格式化"将于 YYYY-MM-DD HH:mm 消失" */
-const expireLabel = (item: AnnouncementItem): string => {
-  if (!item.expireTime) return ''
-  const d = new Date(item.expireTime)
-  if (isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `将于 ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())} 消失`
-}
 
 const publishLabel = (item: AnnouncementItem): string => {
   const t = item.publishTime || item.createTime
@@ -134,21 +109,12 @@ const goList = () => {
 }
 
 onMounted(() => {
-  // 首次拉取当前生效列表（客户端，规避 SSR）
   loadActive().catch(() => {})
   document.addEventListener('click', onDocClick, true)
   document.addEventListener('keydown', onKeydown)
-  // 每 30s 更新一次当前时间，驱动进度条平滑刷新
-  progressTimer = setInterval(() => {
-    nowTick.value = Date.now()
-  }, 30_000)
 })
 
 onBeforeUnmount(() => {
-  if (progressTimer) {
-    clearInterval(progressTimer)
-    progressTimer = null
-  }
   document.removeEventListener('click', onDocClick, true)
   document.removeEventListener('keydown', onKeydown)
 })
@@ -200,6 +166,7 @@ onBeforeUnmount(() => {
             @click="goDetail(item.id)"
           >
             <div class="ann-item-head">
+              <span v-if="item.isMarquee === 1" class="tag tag-marquee">跑马灯</span>
               <span v-if="item.isPersistent === 1" class="tag tag-persistent">常驻</span>
               <span class="ann-title">{{ item.title }}</span>
             </div>
@@ -207,17 +174,6 @@ onBeforeUnmount(() => {
               <span class="ann-time">{{ publishLabel(item) }}</span>
               <span v-if="item.viewCount" class="ann-views">阅读 {{ item.viewCount }}</span>
             </div>
-
-            <!-- 进度条（仅非常驻公告） -->
-            <template v-if="item.isPersistent !== 1">
-              <div class="progress-track">
-                <div
-                  class="progress-fill"
-                  :style="{ width: progressOf(item) + '%' }"
-                />
-              </div>
-              <div v-if="expireLabel(item)" class="progress-hint">{{ expireLabel(item) }}</div>
-            </template>
           </button>
         </div>
 
@@ -367,6 +323,15 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 600;
 }
+.tag-marquee {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: var(--warning, #f59e0b);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
 .ann-title {
   font-size: 14px;
   font-weight: 600;
@@ -386,27 +351,6 @@ onBeforeUnmount(() => {
 }
 .ann-views {
   margin-left: auto;
-}
-
-/* 进度条 */
-.progress-track {
-  margin-top: 8px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--bg-hover);
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--primary-light), var(--primary));
-  /* 平滑过渡：每次 tick 用 width 变化触发 transition */
-  transition: width 1s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
-}
-.progress-hint {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-tertiary);
 }
 
 /* 底部 */

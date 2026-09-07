@@ -26,6 +26,12 @@ public class SysUser implements Serializable {
 
     private String nickname;
 
+    /** 昵称最后修改时间，用于「3日只能改一次」校验（门户个人中心） */
+    private LocalDateTime nicknameUpdateTime;
+
+    /** 注册 IP（门户注册防刷溯源） */
+    private String registerIp;
+
     /** 密码哈希（BCrypt），永不序列化到前端 */
     @JsonIgnore
     private String password;

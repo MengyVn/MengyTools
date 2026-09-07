@@ -74,6 +74,8 @@ const defaultForm = (): AnnouncementForm => ({
   content: '',
   contentFormat: 'markdown',
   isPersistent: 0,
+  isMarquee: 0,
+  displayDuration: 0,
   publishTime: null,
   expireTime: null,
   status: 0
@@ -140,6 +142,8 @@ const handleEdit = async (row: AnnouncementItem) => {
       content: data.content,
       contentFormat: (data.contentFormat === 'html' ? 'html' : 'markdown'),
       isPersistent: data.isPersistent,
+      isMarquee: data.isMarquee,
+      displayDuration: data.displayDuration,
       publishTime: data.publishTime,
       expireTime: data.expireTime,
       status: data.status === 0 ? 0 : 1
@@ -156,10 +160,11 @@ const handleDelete = async (row: AnnouncementItem) => {
   fetchList()
 }
 
-// 常驻切换：开启常驻时清空消失时间
-const handlePersistentChange = (val: boolean | string | number) => {
-  if (val === 1) {
-    form.expireTime = null
+// 跑马灯切换：关闭跑马灯时清零显示时长
+const handleMarqueeChange = (val: boolean | string | number) => {
+  if (val !== 1) {
+    form.displayDuration = 0
+    form.isPersistent = 0
   }
 }
 
@@ -168,9 +173,10 @@ const handleSubmit = async () => {
     ElMessage.warning('请输入标题')
     return
   }
-  // 常驻公告强制清空消失时间
-  if (form.isPersistent === 1) {
-    form.expireTime = null
+  // 非跑马灯公告清零跑马灯专属字段
+  if (form.isMarquee !== 1) {
+    form.displayDuration = 0
+    form.isPersistent = 0
   }
   submitting.value = true
   try {
@@ -248,18 +254,28 @@ onMounted(fetchList)
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="跑马灯" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.isMarquee === 1" type="warning" size="small">是</el-tag>
+            <el-tag v-else type="info" size="small">否</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="显示时长" width="110">
+          <template #default="{ row }">
+            <span v-if="row.isMarquee === 1">
+              {{ row.displayDuration && row.displayDuration > 0 ? row.displayDuration + '分钟' : '持续显示' }}
+            </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="常驻" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.isPersistent === 1 ? 'success' : 'info'" size="small">
-              {{ row.isPersistent === 1 ? '是' : '否' }}
-            </el-tag>
+            <el-tag v-if="row.isPersistent === 1" type="success" size="small">是</el-tag>
+            <el-tag v-else type="info" size="small">否</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="发布时间" width="170">
           <template #default="{ row }">{{ formatTime(row.publishTime) }}</template>
-        </el-table-column>
-        <el-table-column label="消失时间" width="170">
-          <template #default="{ row }">{{ formatTime(row.expireTime) }}</template>
         </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
@@ -348,18 +364,18 @@ onMounted(fetchList)
           </div>
         </el-form-item>
 
+        <el-form-item label="滚动出现在首页顶部">
+          <el-switch
+            v-model="form.isMarquee"
+            :active-value="1"
+            :inactive-value="0"
+            @change="handleMarqueeChange"
+          />
+          <span class="form-hint">开启后该公告将以跑马灯形式滚动显示在首页顶部</span>
+        </el-form-item>
+
         <el-row :gutter="16">
-          <el-col :span="8">
-            <el-form-item label="是否常驻">
-              <el-switch
-                v-model="form.isPersistent"
-                :active-value="1"
-                :inactive-value="0"
-                @change="handlePersistentChange"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="状态">
               <el-select v-model="form.status" style="width: 100%">
                 <el-option
@@ -371,7 +387,7 @@ onMounted(fetchList)
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="发布时间">
               <el-date-picker
                 v-model="form.publishTime"
@@ -384,23 +400,32 @@ onMounted(fetchList)
           </el-col>
         </el-row>
 
-        <el-form-item
-          v-if="form.isPersistent === 0"
-          label="消失时间"
-          required
-        >
-          <el-date-picker
-            v-model="form.expireTime"
-            type="datetime"
-            placeholder="公告到期时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-
-        <div v-if="form.isPersistent === 1" class="tip-text">
-          常驻公告不会自动消失，无需设置消失时间。
-        </div>
+        <template v-if="form.isMarquee === 1">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="显示时长（分钟）">
+                <el-input-number
+                  v-model="form.displayDuration"
+                  :min="0"
+                  :step="1"
+                  placeholder="0=一直显示"
+                  style="width: 100%"
+                />
+                <span class="form-hint">0 或留空=一直显示，用户必须手动点击关闭才能屏蔽</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="是否常驻">
+                <el-switch
+                  v-model="form.isPersistent"
+                  :active-value="1"
+                  :inactive-value="0"
+                />
+                <span class="form-hint">常驻=每次登录都重新弹出；非常驻=用户关闭后跨登录保持关闭</span>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
       </el-form>
 
       <template #footer>
@@ -443,5 +468,10 @@ onMounted(fetchList)
   font-size: 12px;
   color: #999;
   margin-top: -8px;
+}
+.form-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #999;
 }
 </style>
