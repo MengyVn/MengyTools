@@ -1,6 +1,7 @@
 package com.mengy.tools.security;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,7 @@ import java.util.List;
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -42,6 +44,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/portal/announcements/**").permitAll()
+                        // 社区：通知与「我的互动状态」属于个人数据，必须先于公开 GET 规则要求登录
+                        .requestMatchers("/api/v1/community/notifications/**",
+                                "/api/v1/community/reactions/**",
+                                "/api/v1/community/follows/**").authenticated()
+                        // 社区只读接口公开；写入类（POST/DELETE）走 anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/**").permitAll()
                         .requestMatchers(permitPaths).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -68,7 +76,16 @@ public class SecurityConfig {
 
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        List<String> origins = securityProperties.getAllowedOrigins();
+        if (origins == null || origins.isEmpty() || origins.contains("*")) {
+            // 兜底通配：仅适用于本地开发。生产环境务必配置 mengy.security.allowed-origins
+            log.warn("CORS 当前允许任意来源（mengy.security.allowed-origins 未配置或含 *）。"
+                    + "因 allowCredentials=true，生产环境必须改为白名单域名。");
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            config.setAllowedOriginPatterns(origins);
+            log.info("CORS 白名单生效：{}", origins);
+        }
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

@@ -53,7 +53,16 @@ service.interceptors.response.use(
       router.push('/login')
       if (!skipToast) ElMessage.error('登录已过期，请重新登录')
     } else if (status === 403) {
-      if (!skipToast) ElMessage.error('无权访问')
+      // 403 有两种成因，给可操作的提示：
+      //   1) 后端 CORS 白名单拒绝了当前访问地址（响应体为 Invalid CORS request）
+      //   2) 当前账号缺少该操作所需的权限点
+      const raw = String(error.response?.data?.message || error.response?.data || '')
+      const corsBlocked = /invalid cors request/i.test(raw)
+      const msg = corsBlocked
+        ? `跨域来源被后端拒绝：请把当前访问地址（${window.location.origin}）加入后端 ALLOWED_ORIGINS 白名单并重启后端`
+        : '无权访问：当前账号缺少该操作所需的权限点'
+      if (!skipToast) ElMessage.error(msg)
+      return Promise.reject(new Error(msg))
     } else if (!skipToast) {
       // 优先展示后端业务错误消息（Result{code,message}）
       const backendMsg = error.response?.data?.message
