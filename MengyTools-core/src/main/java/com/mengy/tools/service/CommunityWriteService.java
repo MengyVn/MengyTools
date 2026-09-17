@@ -6,12 +6,10 @@ import com.mengy.tools.dto.CommentCreateRequest;
 import com.mengy.tools.dto.CommunityCommentDTO;
 import com.mengy.tools.dto.CommunityUserStateDTO;
 import com.mengy.tools.dto.ReportCreateRequest;
-import com.mengy.tools.entity.CommunityAuditLog;
 import com.mengy.tools.entity.CommunityComment;
 import com.mengy.tools.entity.CommunityNotification;
 import com.mengy.tools.entity.CommunityReport;
 import com.mengy.tools.mapper.CommunityArticleMapper;
-import com.mengy.tools.mapper.CommunityAuditLogMapper;
 import com.mengy.tools.mapper.CommunityCommentMapper;
 import com.mengy.tools.mapper.CommunityNotificationMapper;
 import com.mengy.tools.mapper.CommunityReportMapper;
@@ -41,8 +39,8 @@ public class CommunityWriteService {
     private final CommunityArticleMapper articleMapper;
     private final CommunityCommentMapper commentMapper;
     private final CommunityReportMapper reportMapper;
-    private final CommunityAuditLogMapper auditLogMapper;
     private final CommunityNotificationMapper notificationMapper;
+    private final CommunityAuditService auditService;
     private final CommunityUserMapper userMapper;
 
     // ==================== 评论 ====================
@@ -168,6 +166,19 @@ public class CommunityWriteService {
         }
         commentMapper.deleteById(commentId);
         articleMapper.recountArticleStats(c.getArticleId());
+    }
+
+    // ==================== 个人资料 ====================
+
+    /** 更新个人签名（社区资料页用；昵称等账号信息走门户接口） */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateSignature(Long userId, String signature) {
+        guard.assertCanWrite(guard.loadUser(userId));
+        String value = signature == null ? "" : signature.trim();
+        if (value.length() > 100) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "个人签名最多 100 个字");
+        }
+        userMapper.updateSignature(userId, value);
     }
 
     // ==================== 举报 ====================
@@ -319,19 +330,10 @@ public class CommunityWriteService {
 
     // ==================== 内部工具 ====================
 
+    /** 治理留痕：委托给 CommunityAuditService（帖子治理复用同一实现） */
     private void writeAuditLog(Long operatorId, String operatorName, String action, String targetType,
                                Long targetId, String before, String after, String note, String ip) {
-        CommunityAuditLog logRow = new CommunityAuditLog();
-        logRow.setOperatorId(operatorId);
-        logRow.setOperatorName(operatorName == null ? "" : operatorName);
-        logRow.setAction(action);
-        logRow.setTargetType(targetType);
-        logRow.setTargetId(targetId);
-        logRow.setBeforeValue(abbreviate(before, 500));
-        logRow.setAfterValue(abbreviate(after, 500));
-        logRow.setNote(note == null ? "" : abbreviate(note, 255));
-        logRow.setIp(ip == null ? "" : ip);
-        auditLogMapper.insert(logRow);
+        auditService.write(operatorId, operatorName, action, targetType, targetId, before, after, note, ip);
     }
 
     private void notify(Long toUserId, String type, Long actorId, Long actorUserId,

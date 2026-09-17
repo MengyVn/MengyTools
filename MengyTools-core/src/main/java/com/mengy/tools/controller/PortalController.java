@@ -58,6 +58,8 @@ public class PortalController {
     public Result<List<ArticleListItemDTO>> listArticles() {
         List<BlogArticle> articles = articleMapper.selectList(
                 new LambdaQueryWrapper<BlogArticle>()
+                        // 只取站主博客；社区用户帖（content_type=community）不进个人门户
+                        .apply("content_type = 'blog'")
                         .eq(BlogArticle::getStatus, 1)
                         .orderByDesc(BlogArticle::getIsTop)
                         .orderByDesc(BlogArticle::getPublishTime)
@@ -95,6 +97,10 @@ public class PortalController {
     public Result<ArticleDetailDTO> getArticle(@PathVariable Long id) {
         BlogArticle article = articleMapper.selectById(id);
         if (article == null || (article.getStatus() == null || article.getStatus() != 1)) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未发布");
+        }
+        // 社区用户帖只在社区侧展示，门户按“不存在”处理
+        if (articleMapper.countBlogArticle(id) == 0) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未发布");
         }
         ArticleDetailDTO dto = new ArticleDetailDTO();

@@ -14,7 +14,7 @@ export const COMMUNITY_SITE = {
   locale: 'zh-CN',
   nav: [
     { to: '/community', label: '首页' },
-    { to: '/community/tags', label: '标签' },
+    { to: '/community/boards', label: '板块' },
     { to: '/community/search', label: '搜索' }
   ]
 }

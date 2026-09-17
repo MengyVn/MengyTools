@@ -52,3 +52,5 @@ Thumbs.db
 
 # ===== 日志 =====
 logs/
+
+.dbtest

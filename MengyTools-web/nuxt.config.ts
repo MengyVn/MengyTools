@@ -1,3 +1,7 @@
+// 后端地址：服务端渲染走 SERVER_API_BASE；开发代理默认指 8120，
+// 可用 DEV_API_TARGET 覆盖（便于同时跑多个后端实例联调）
+const DEV_API_TARGET = process.env.DEV_API_TARGET || 'http://127.0.0.1:8120/api'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
@@ -51,7 +55,7 @@ export default defineNuxtConfig({
   nitro: {
     devProxy: {
       '/api': {
-        target: 'http://127.0.0.1:8120/api',
+        target: DEV_API_TARGET,
         changeOrigin: true
       },
       // 图片：转发到本机 nginx（devProxy 会剥掉 /images 前缀，故 target 需带 /images）

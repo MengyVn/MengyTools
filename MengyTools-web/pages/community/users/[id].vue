@@ -181,7 +181,7 @@ useHead(() => ({
       />
     </section>
 
-    <LoginModal v-model:visible="showLogin" @logged-in="showLogin = false" />
+    <CommunityAuthModal v-model:visible="showLogin" @logged-in="showLogin = false" />
   </div>
 </template>
 

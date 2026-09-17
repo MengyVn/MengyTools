@@ -16,15 +16,34 @@ const { siteName, siteTagline } = useCommunitySite()
 
 const page = computed(() => Math.max(Number(route.query.page) || 1, 1))
 const sort = computed<'latest' | 'hot'>(() => (route.query.sort === 'hot' ? 'hot' : 'latest'))
+/** 板块筛选：?category=<id>（板块列表/侧栏/详情页面包屑都会带过来） */
+const categoryId = computed(() => {
+  const raw = Number(route.query.category)
+  return Number.isFinite(raw) && raw > 0 ? raw : undefined
+})
 
 const { data } = await useAsyncData(
-  () => `community-index-${page.value}-${sort.value}`,
-  () => listArticles({ page: page.value, size: 20, sort: sort.value }),
-  { watch: [page, sort] }
+  () => `community-index-${page.value}-${sort.value}-${categoryId.value ?? 'all'}`,
+  () => listArticles({ page: page.value, size: 20, sort: sort.value, categoryId: categoryId.value }),
+  { watch: [page, sort, categoryId] }
+)
+
+// 板块名（筛选时显示在标题区；复用板块接口，与其他页共享缓存键）
+const { boards: fetchBoards } = useCommunity()
+const { data: boardList } = await useAsyncData('community-boards', () => fetchBoards())
+const currentBoard = computed(() =>
+  categoryId.value ? (boardList.value ?? []).find((b) => b.id === categoryId.value) : undefined
 )
 
 const setSort = (s: 'latest' | 'hot') => {
-  router.push({ path: '/community', query: s === 'hot' ? { sort: 'hot' } : {} })
+  const query: Record<string, unknown> = { ...route.query }
+  delete query.page
+  if (s === 'hot') {
+    query.sort = 'hot'
+  } else {
+    delete query.sort
+  }
+  router.push({ path: '/community', query })
 }
 const changePage = (p: number) => {
   router.push({ path: '/community', query: { ...route.query, page: p } })
@@ -63,8 +82,17 @@ useHead(() => ({
 <template>
   <div class="home">
     <section class="intro">
-      <h1 class="intro-title">{{ siteName }}</h1>
-      <p class="intro-desc">{{ siteTagline }}</p>
+      <template v-if="currentBoard">
+        <h1 class="intro-title">{{ currentBoard.name }}</h1>
+        <p class="intro-desc">
+          板块内共 {{ data?.total ?? 0 }} 篇 ·
+          <NuxtLink to="/community" class="intro-link">查看全部板块内容</NuxtLink>
+        </p>
+      </template>
+      <template v-else>
+        <h1 class="intro-title">{{ siteName }}</h1>
+        <p class="intro-desc">{{ siteTagline }}</p>
+      </template>
     </section>
 
     <div class="layout">
@@ -88,7 +116,10 @@ useHead(() => ({
               最热
             </button>
           </div>
-          <span class="toolbar-count">共 {{ data?.total ?? 0 }} 篇</span>
+          <span class="toolbar-count">
+            <NuxtLink v-if="currentBoard" to="/community/boards" class="toolbar-link">← 全部板块</NuxtLink>
+            共 {{ data?.total ?? 0 }} 篇
+          </span>
         </div>
 
         <CommunityArticleList :items="data?.records ?? []" show-category />
@@ -157,8 +188,18 @@ useHead(() => ({
   font-weight: 500;
 }
 .toolbar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   color: var(--c-text-faint);
   font-size: 12.5px;
+}
+.toolbar-link,
+.intro-link {
+  color: var(--c-accent);
+}
+.intro-link {
+  font-size: 13px;
 }
 @media (max-width: 900px) {
   .layout {

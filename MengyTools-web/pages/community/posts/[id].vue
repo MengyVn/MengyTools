@@ -8,6 +8,7 @@
 import { marked } from 'marked'
 import { MessageSquare, Eye, Clock, Heart, Star, Flag, Trash2, CornerDownRight } from 'lucide-vue-next'
 import { COMMUNITY_SITE } from '~/community-site.config'
+import { imageUrl, hasImage } from '~/utils/image'
 import { useCommunitySite } from '~/composables/useCommunitySite'
 import {
   useCommunity,
@@ -54,6 +55,45 @@ const htmlContent = computed(() => {
   if (a.contentHtml) return a.contentHtml
   if (!a.content) return ''
   return marked.parse(a.content, { async: false }) as string
+})
+
+// ==================== 阅读量埋点 ====================
+// 与门户同一套机制：cookie 存访客ID（同一浏览器在门户与社区共用一个访客），
+// 后端按「文章+访客ID」24 小时去重，命中才自增 view_count。
+const api = useApi()
+const visitorId = useCookie<string | undefined>('visitor_id', {
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: 'lax'
+})
+// crypto.randomUUID 在非 HTTPS（http://localhost）下不可用，需兼容回退
+const genVisitorId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+onMounted(() => {
+  const a = article.value
+  if (!a) return
+  if (!visitorId.value) {
+    visitorId.value = genVisitorId()
+  }
+  api
+    .post<boolean>('/v1/track/view', { articleId: a.id, visitorId: visitorId.value })
+    .then((counted) => {
+      // 本次为有效计数时本地即时 +1，无需刷新页面
+      if (counted && article.value) {
+        article.value.viewCount = (article.value.viewCount || 0) + 1
+      }
+    })
+    .catch(() => {
+      /* 埋点失败不影响阅读 */
+    })
 })
 
 // ==================== 互动状态 ====================
@@ -201,6 +241,19 @@ const removeComment = async (c: CommunityComment) => {
 
 const canDelete = (c: CommunityComment) => isLoggedIn.value && user.value?.id === c.authorId
 
+/** 本帖作者（作者可编辑/删除自己的帖子） */
+const isAuthor = computed(() => isLoggedIn.value && !!user.value?.id && user.value.id === article.value?.authorId)
+
+const removePost = async () => {
+  if (!confirm('确定删除这篇帖子吗？删除后不可恢复。')) return
+  try {
+    await deletePost(Number(id.value))
+    router.push('/community/my-posts')
+  } catch (e: any) {
+    errMsg.value = e?.data?.message || e?.message || '删除失败'
+  }
+}
+
 // ==================== 举报 ====================
 const reportTarget = ref<CommunityComment | null>(null)
 const reportReason = ref('广告营销')
@@ -303,7 +356,9 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
     <CommunityBreadcrumb
       :items="[
         { label: '社区首页', to: '/community' },
-        ...(article.categoryName ? [{ label: article.categoryName }] : []),
+        ...(article.categoryName
+          ? [{ label: article.categoryName, to: article.categoryId ? `/community?category=${article.categoryId}` : undefined }]
+          : []),
         { label: article.title }
       ]"
     />
@@ -349,9 +404,18 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
               <Star :size="15" />{{ reaction.favorite ? '已收藏' : '收藏' }}
               <em>{{ formatCount(reaction.favoriteCount) }}</em>
             </button>
+            <template v-if="isAuthor">
+              <NuxtLink :to="`/community/edit/${id}`" class="action-btn">编辑</NuxtLink>
+              <button type="button" class="action-btn" @click="removePost">删除</button>
+            </template>
             <NuxtLink to="/community/notifications" class="action-link">我的消息</NuxtLink>
           </div>
         </header>
+
+        <!-- 封面图 -->
+        <figure v-if="hasImage(article.cover)" class="post-cover">
+          <img :src="imageUrl(article.cover)" :alt="article.title" loading="lazy" />
+        </figure>
 
         <!-- 正文 -->
         <div class="post-body markdown-body" v-html="htmlContent" />
@@ -403,7 +467,7 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
           <ul v-if="commentPage?.records?.length" class="floors">
             <li v-for="c in commentPage.records" :key="c.id" class="floor">
               <div class="floor-side">
-                <img v-if="c.authorAvatar" :src="c.authorAvatar" :alt="c.authorName" class="floor-avatar" />
+                <img v-if="c.authorAvatar" :src="imageUrl(c.authorAvatar)" :alt="c.authorName" class="floor-avatar" />
                 <span v-else class="floor-avatar floor-avatar-text">{{ initials(c.authorName) }}</span>
               </div>
               <div class="floor-main">
@@ -499,7 +563,7 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
       </div>
     </div>
 
-    <LoginModal v-model:visible="showLogin" @logged-in="showLogin = false" />
+    <CommunityAuthModal v-model:visible="showLogin" @logged-in="showLogin = false" />
   </div>
 </template>
 
@@ -599,6 +663,20 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
 }
 .action-link:hover {
   color: var(--c-accent);
+}
+
+.post-cover {
+  margin: 16px 0 4px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius);
+  overflow: hidden;
+  background: var(--c-surface-alt);
+}
+.post-cover img {
+  display: block;
+  width: 100%;
+  max-height: 380px;
+  object-fit: cover;
 }
 
 .post-body {

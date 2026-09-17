@@ -6,6 +6,7 @@
 import { MessageSquare, Eye } from 'lucide-vue-next'
 import type { CommunityArticle } from '~/composables/useCommunity'
 import { formatCount, formatRelativeTime } from '~/composables/useCommunity'
+import { imageUrl, hasImage } from '~/utils/image'
 
 defineProps<{ items: CommunityArticle[]; showCategory?: boolean }>()
 </script>
@@ -13,6 +14,14 @@ defineProps<{ items: CommunityArticle[]; showCategory?: boolean }>()
 <template>
   <ul class="al">
     <li v-for="item in items" :key="item.id" class="al-row">
+      <NuxtLink
+        v-if="hasImage(item.cover)"
+        :to="`/community/posts/${item.id}`"
+        class="al-thumb-wrap"
+        :aria-label="item.title"
+      >
+        <img :src="imageUrl(item.cover)" :alt="item.title" class="al-thumb" loading="lazy" />
+      </NuxtLink>
       <div class="al-main">
         <NuxtLink :to="`/community/posts/${item.id}`" class="al-title">
           <span v-if="item.isTop" class="al-badge al-badge-top">置顶</span>
@@ -65,6 +74,21 @@ defineProps<{ items: CommunityArticle[]; showCategory?: boolean }>()
 }
 .al-row:hover {
   background: var(--c-surface-alt);
+}
+.al-thumb-wrap {
+  flex-shrink: 0;
+  width: 112px;
+  height: 72px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius);
+  overflow: hidden;
+  background: var(--c-surface-alt);
+}
+.al-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .al-main {
   min-width: 0;

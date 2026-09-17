@@ -4,6 +4,7 @@
  * 数据来自单次聚合接口 /v1/community/sidebar，避免并发多个小请求。
  */
 import { useCommunity, formatCount } from '~/composables/useCommunity'
+import { imageUrl } from '~/utils/image'
 
 const { sidebar } = useCommunity()
 
@@ -16,7 +17,7 @@ const stats = computed(() => {
     { label: '文章', value: formatCount(d?.articleCount) },
     { label: '评论', value: formatCount(d?.commentCount) },
     { label: '成员', value: formatCount(d?.userCount) },
-    { label: '标签', value: formatCount(d?.tagCount) }
+
   ]
 })
 
@@ -35,19 +36,17 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
       </ul>
     </section>
 
-    <section v-if="data?.hotTags?.length" class="sb-card">
-      <h3 class="sb-title">热门标签</h3>
-      <div class="sb-tags">
-        <NuxtLink
-          v-for="tag in data.hotTags"
-          :key="tag.id"
-          :to="`/community/tags/${tag.slug}`"
-          class="sb-tag"
-        >
-          {{ tag.name }}<em>{{ tag.articleCount }}</em>
-        </NuxtLink>
-      </div>
-      <NuxtLink to="/community/tags" class="sb-more">全部标签 →</NuxtLink>
+    <section v-if="data?.boards?.length" class="sb-card">
+      <h3 class="sb-title">板块</h3>
+      <ul class="sb-boards">
+        <li v-for="b in data.boards" :key="b.id">
+          <NuxtLink :to="`/community?category=${b.id}`" class="sb-board">
+            <span class="sb-board-name">{{ b.name }}</span>
+            <span class="sb-board-count">{{ b.postCount }}</span>
+          </NuxtLink>
+        </li>
+      </ul>
+      <NuxtLink to="/community/boards" class="sb-more">全部板块 →</NuxtLink>
     </section>
 
     <section v-if="data?.activeUsers?.length" class="sb-card">
@@ -55,7 +54,7 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
       <ul class="sb-users">
         <li v-for="u in data.activeUsers" :key="u.id">
           <NuxtLink :to="`/community/users/${u.id}`" class="sb-user">
-            <img v-if="u.avatar" :src="u.avatar" :alt="u.nickname" class="sb-avatar" />
+            <img v-if="u.avatar" :src="imageUrl(u.avatar)" :alt="u.nickname" class="sb-avatar" />
             <span v-else class="sb-avatar sb-avatar-text">{{ initials(u.nickname) }}</span>
             <span class="sb-user-name">{{ u.nickname }}</span>
             <span class="sb-user-count">{{ u.commentCount }}</span>
@@ -107,29 +106,28 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
   color: var(--c-text-faint);
   font-size: 12.5px;
 }
-.sb-tags {
+.sb-boards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sb-board {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.sb-tag {
-  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border: 1px solid var(--c-border);
-  border-radius: 3px;
-  background: var(--c-surface-alt);
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 4px;
+  border-radius: var(--c-radius);
   color: var(--c-text-muted);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
-.sb-tag:hover {
-  border-color: var(--c-accent);
+.sb-board:hover {
+  background: var(--c-surface-alt);
   color: var(--c-accent);
 }
-.sb-tag em {
+.sb-board-count {
   color: var(--c-text-faint);
-  font-style: normal;
+  font-size: 12px;
 }
 .sb-more {
   display: inline-block;

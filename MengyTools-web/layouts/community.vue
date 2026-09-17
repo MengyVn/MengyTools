@@ -6,10 +6,12 @@
  *  - 门户保持冻结，本布局不引用门户任何 class 或组件样式；
  *  - 自带一套设计令牌（中性灰阶 + 单一强调色、8pt 间距、无动效），刻意去掉门户的
  *    渐变/跑马灯/滚动渐入等个性化元素；
- *  - 仅复用「功能型」资产：useAuth（登录态）、LoginModal（登录/注册弹窗）、ThemeToggle（明暗切换）。
+ *  - 仅复用「功能型」资产：useAuth（登录态）、SlideCaptcha（滑动验证）、ThemeToggle（明暗切换）；
+ *  登录/注册用社区自己的 CommunityAuthModal（社区风格），不再使用门户的 LoginModal。
  */
-import { Menu, Search, User, X, Bell } from 'lucide-vue-next'
+import { Menu, Search, User, X, Bell, PenLine } from 'lucide-vue-next'
 import { COMMUNITY_SITE, useCommunity } from '~/composables/useCommunity'
+import { imageUrl } from '~/utils/image'
 import { useCommunitySite } from '~/composables/useCommunitySite'
 
 const { user, isLoggedIn, init, logout } = useAuth()
@@ -96,9 +98,6 @@ const year = new Date().getFullYear()
           >
             {{ link.label }}
           </NuxtLink>
-          <NuxtLink to="/?portal=1" class="c-nav-link c-nav-portal" title="返回个人门户（并记住该偏好）">
-            门户
-          </NuxtLink>
         </nav>
 
         <div class="c-header-right">
@@ -106,6 +105,11 @@ const year = new Date().getFullYear()
             <Search :size="15" class="c-search-icon" />
             <input v-model="keyword" type="search" placeholder="搜索文章" aria-label="搜索文章" />
           </form>
+
+          <NuxtLink to="/community/new" class="c-post-btn" title="发布新帖">
+            <PenLine :size="15" />
+            <span>发帖</span>
+          </NuxtLink>
 
           <NuxtLink to="/community/notifications" class="c-bell" title="我的消息" aria-label="我的消息">
             <Bell :size="17" />
@@ -116,7 +120,7 @@ const year = new Date().getFullYear()
 
           <template v-if="isLoggedIn">
             <button class="c-user-trigger" type="button" @click="toggleUserMenu">
-              <img v-if="user?.avatar" :src="user.avatar" :alt="user.nickname" class="c-avatar" />
+              <img v-if="user?.avatar" :src="imageUrl(user.avatar)" :alt="user.nickname" class="c-avatar" />
               <span v-else class="c-avatar c-avatar-text">{{ initials }}</span>
               <span class="c-user-name">{{ user?.nickname || user?.username }}</span>
             </button>
@@ -124,7 +128,8 @@ const year = new Date().getFullYear()
               <NuxtLink v-if="user?.id" :to="`/community/users/${user.id}`" class="c-user-menu-item">
                 我的主页
               </NuxtLink>
-              <NuxtLink to="/profile" class="c-user-menu-item">个人设置</NuxtLink>
+              <NuxtLink to="/community/my-posts" class="c-user-menu-item">我的帖子</NuxtLink>
+              <NuxtLink to="/community/settings" class="c-user-menu-item">个人设置</NuxtLink>
               <button type="button" class="c-user-menu-item c-user-menu-danger" @click="doLogout">
                 退出登录
               </button>
@@ -162,14 +167,14 @@ const year = new Date().getFullYear()
         </div>
         <div class="c-footer-links">
           <NuxtLink to="/community">首页</NuxtLink>
-          <NuxtLink to="/community/tags">标签</NuxtLink>
-          <NuxtLink to="/">MengyTools 门户</NuxtLink>
+          <NuxtLink to="/community/boards">板块</NuxtLink>
+          <NuxtLink to="/community/search">搜索</NuxtLink>
         </div>
         <p class="c-copyright">© {{ year }} {{ siteName }}</p>
       </div>
     </footer>
 
-    <LoginModal v-model:visible="showLogin" @logged-in="showLogin = false" />
+    <CommunityAuthModal v-model:visible="showLogin" @logged-in="showLogin = false" />
   </div>
 </template>
 
@@ -197,18 +202,7 @@ const year = new Date().getFullYear()
   line-height: 1.65;
 }
 
-:global([data-theme='dark']) .community {
-  --c-bg: #0e1116;
-  --c-surface: #161a20;
-  --c-surface-alt: #1a1f26;
-  --c-border: #262c35;
-  --c-border-strong: #333b46;
-  --c-text: #e6e9ee;
-  --c-text-muted: #9aa3b0;
-  --c-text-faint: #6f7886;
-  --c-accent: #6ea8fe;
-  --c-accent-soft: #1b2434;
-}
+
 
 .c-container {
   width: 100%;
@@ -272,9 +266,6 @@ const year = new Date().getFullYear()
   color: var(--c-accent);
   font-weight: 500;
 }
-.c-nav-portal {
-  color: var(--c-text-faint);
-}
 
 .c-header-right {
   display: flex;
@@ -311,6 +302,22 @@ const year = new Date().getFullYear()
 }
 .c-search input::placeholder {
   color: var(--c-text-faint);
+}
+
+.c-post-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--c-accent);
+  border-radius: var(--c-radius);
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 13.5px;
+}
+.c-post-btn:hover {
+  opacity: 0.92;
 }
 
 .c-bell {
@@ -521,5 +528,29 @@ const year = new Date().getFullYear()
     flex-direction: column;
     align-items: flex-start;
   }
+}
+</style>
+
+<!--
+  深色主题令牌必须放在非 scoped 块里：
+  在 scoped 块中写 :global([data-theme='dark']) .community，Vue 的 scoped 编译器会把选择器
+  压成 [data-theme='dark']（丢掉 .community），变量就落在 <html> 上；而 .community 自身又
+  声明了一套浅色变量——元素自身声明优先于继承，于是切换主题完全没反应。
+  这里用 html[data-theme='dark'] .community：特异性 (0,2,1) 高于 .community[data-v-x] (0,2,0)，
+  仍然读取 <html> 上的 data-theme（nuxt.config 的防闪烁脚本在 hydration 前就写好了），因此既生效又不会闪。
+  只以 .community 限定，门户没有该元素，故对门户零影响。
+-->
+<style>
+html[data-theme='dark'] .community {
+  --c-bg: #0e1116;
+  --c-surface: #161a20;
+  --c-surface-alt: #1a1f26;
+  --c-border: #262c35;
+  --c-border-strong: #333b46;
+  --c-text: #e6e9ee;
+  --c-text-muted: #9aa3b0;
+  --c-text-faint: #6f7886;
+  --c-accent: #6ea8fe;
+  --c-accent-soft: #1b2434;
 }
 </style>

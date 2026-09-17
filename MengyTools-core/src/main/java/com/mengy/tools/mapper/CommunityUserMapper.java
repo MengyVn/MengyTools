@@ -96,6 +96,10 @@ public interface CommunityUserMapper {
     @Update("UPDATE sys_user SET mute_until = #{muteUntil} WHERE id = #{id} AND deleted = 0")
     int updateMuteUntil(@Param("id") Long id, @Param("muteUntil") LocalDateTime muteUntil);
 
+    /** 更新个人签名（社区资料） */
+    @Update("UPDATE sys_user SET signature = #{signature} WHERE id = #{id} AND deleted = 0")
+    int updateSignature(@Param("id") Long id, @Param("signature") String signature);
+
     /** 封禁/解封（status: 0封禁 1正常）。 */
     @Update("UPDATE sys_user SET status = #{status} WHERE id = #{id} AND deleted = 0")
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);

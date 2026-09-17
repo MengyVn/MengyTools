@@ -133,7 +133,34 @@ public class CommunityGuardService {
         }
     }
 
-    /** 互动限频（点赞/收藏/关注共用一个每分钟配额） */
+    /** 发帖限频：同一用户 60 秒最多 1 篇，每天最多 10 篇 */
+    private static final int POST_MIN_INTERVAL_SEC = 60;
+    private static final int POST_PER_DAY = 10;
+
+    public void checkPostRate(Long userId) {
+        String intervalKey = "post:gap:" + userId;
+        if (Boolean.FALSE.equals(redisTemplate.opsForValue()
+                .setIfAbsent(intervalKey, "1", Duration.ofSeconds(POST_MIN_INTERVAL_SEC)))) {
+            throw new BusinessException(ResultCode.TOO_MANY_REQUESTS,
+                    "发帖太频繁了，请 " + POST_MIN_INTERVAL_SEC + " 秒后再试");
+        }
+        String dayKey = "post:day:" + userId + ":" + java.time.LocalDate.now();
+        if (bump(dayKey, Duration.ofHours(25)) > POST_PER_DAY) {
+            throw new BusinessException(ResultCode.TOO_MANY_REQUESTS, "今日发帖数已达上限（" + POST_PER_DAY + " 篇）");
+        }
+    }
+
+    /** 图片上传限频：每小时最多 40 张 */
+    private static final int UPLOAD_PER_HOUR = 40;
+
+    public void checkUploadRate(Long userId) {
+        String key = "cm:upload:" + userId + ":" + (System.currentTimeMillis() / 3600000L);
+        if (bump(key, Duration.ofHours(2)) > UPLOAD_PER_HOUR) {
+            throw new BusinessException(ResultCode.TOO_MANY_REQUESTS, "本小时上传图片数已达上限（" + UPLOAD_PER_HOUR + " 张）");
+        }
+    }
+
+    /** 互动限频（点赞/收藏/关注共用一个每分钟令牌配额） */
     public void checkInteractRate(Long userId) {
         String key = "cm:act:" + userId + ":" + (System.currentTimeMillis() / 60000L);
         if (bump(key, Duration.ofMinutes(2)) > INTERACT_PER_MINUTE) {

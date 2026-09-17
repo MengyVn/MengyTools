@@ -15,6 +15,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：业务异常、参数校验异常、安全异常及系统未知异常。
@@ -63,6 +64,18 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Result<Void> handleAuth(AuthenticationException e) {
         return Result.fail(ResultCode.UNAUTHORIZED);
+    }
+
+    /**
+     * 访问不存在的路径。
+     * Spring 6.1 起未匹配的请求会抛 NoResourceFoundException，若不单独处理会被下面的
+     * Exception 兜底成 500「系统繁忙」——把「接口不存在」误报成服务端故障，排查时很误导。
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Result<Void> handleNoResource(NoResourceFoundException e, HttpServletRequest request) {
+        log.warn("[路径不存在] uri={}", request.getRequestURI());
+        return Result.fail(ResultCode.NOT_FOUND, "接口不存在：" + request.getRequestURI());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -19,10 +19,6 @@ interface ArticleItem {
   createTime?: string
 }
 
-interface TagItem {
-  slug: string
-}
-
 interface UserBrief {
   id: number
 }
@@ -45,7 +41,7 @@ export default defineEventHandler(async (event) => {
     { loc: '/nav', changefreq: 'weekly', priority: '0.6' },
     { loc: '/announcement', changefreq: 'weekly', priority: '0.5' },
     { loc: '/community', changefreq: 'hourly', priority: '0.9' },
-    { loc: '/community/tags', changefreq: 'weekly', priority: '0.6' }
+    { loc: '/community/boards', changefreq: 'weekly', priority: '0.6' }
   ]
 
   try {
@@ -62,15 +58,6 @@ export default defineEventHandler(async (event) => {
     }
   } catch {
     /* 后端不可用时仍返回静态部分，避免 sitemap 整体 500 */
-  }
-
-  try {
-    const tags = await $fetch<{ data: TagItem[] }>(`${api}/v1/community/tags`)
-    for (const t of tags.data ?? []) {
-      urls.push({ loc: `/community/tags/${t.slug}`, changefreq: 'weekly', priority: '0.5' })
-    }
-  } catch {
-    /* 同上 */
   }
 
   try {

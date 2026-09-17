@@ -88,11 +88,15 @@ export interface CommunityUserComment {
   createTime?: string
 }
 
-export interface CommunityTag {
+/** 板块（原分类）：含帖子数与最近一篇 */
+export interface CommunityBoard {
   id: number
   name: string
   slug: string
-  articleCount: number
+  postCount: number
+  latestPostId?: number | null
+  latestPostTitle?: string | null
+  latestPostTime?: string | null
 }
 
 export interface CommunityUserBrief {
@@ -106,9 +110,43 @@ export interface CommunitySidebar {
   articleCount: number
   commentCount: number
   userCount: number
-  tagCount: number
-  hotTags: CommunityTag[]
+  /** 板块导航（含帖子数） */
+  boards: CommunityBoard[]
   activeUsers: CommunityUserBrief[]
+}
+
+/** 发帖表单 */
+export interface PostForm {
+  title: string
+  summary?: string
+  content: string
+  cover?: string
+  categoryId?: number | null
+  allowComment?: number
+}
+
+/** 「我的帖子」/后台帖子列表项 */
+export interface CommunityPostItem {
+  id: number
+  title: string
+  summary?: string
+  cover?: string
+  status: number
+  viewCount?: number
+  commentCount?: number
+  likeCount?: number
+  authorId?: number
+  authorName?: string
+  publishTime?: string
+  createTime?: string
+  updateTime?: string
+}
+
+/** 帖子状态文案（0待审 1已发布 2已屏蔽） */
+export const POST_STATUS_TEXT: Record<number, string> = {
+  0: '待审',
+  1: '已发布',
+  2: '已屏蔽'
 }
 
 /** 通知项（字段对齐后端 CommunityNotification 实体） */
@@ -164,10 +202,8 @@ export const useCommunity = () => {
     userComments: (id: number | string, params: { page?: number; size?: number } = {}) =>
       api.get<PageResult<CommunityUserComment>>(`/v1/community/users/${id}/comments`, { params }),
 
-    tags: () => api.get<CommunityTag[]>('/v1/community/tags'),
-
-    tagArticles: (slug: string, params: { page?: number; size?: number; sort?: 'latest' | 'hot' } = {}) =>
-      api.get<PageResult<CommunityArticle>>(`/v1/community/tags/${slug}/articles`, { params }),
+    /** 板块列表（含帖子数与最近一篇） */
+    boards: () => api.get<CommunityBoard[]>('/v1/community/boards'),
 
     search: (q: string, params: { page?: number; size?: number } = {}) =>
       api.get<PageResult<CommunityArticle>>('/v1/community/search', { params: { q, ...params } }),
@@ -208,6 +244,39 @@ export const useCommunity = () => {
       api.get<{ active: boolean; count: number }>(
         `/v1/community/follows/state?targetType=${targetType}&targetId=${targetId}`
       ),
+
+    // ==================== 发帖（P5） ====================
+
+    /** 分类列表（发帖时选择） */
+    categories: () =>
+      api.get<Array<{ id: number; name: string; slug: string }>>('/v1/community/categories'),
+
+    /** 发表帖子：成功返回新帖 id 与初始状态（0=待审） */
+    createPost: (body: PostForm) =>
+      api.post<{ id: number; status: number }>('/v1/community/posts', body),
+
+    /** 编辑自己的帖子 */
+    updatePost: (id: number, body: PostForm) => api.put<void>(`/v1/community/posts/${id}`, body),
+
+    /** 删除自己的帖子 */
+    deletePost: (id: number) => api.delete<void>(`/v1/community/posts/${id}`),
+
+    /** 我的帖子（含待审/已屏蔽） */
+    myPosts: (params: { page?: number; size?: number; status?: number } = {}) =>
+      api.get<PageResult<CommunityPostItem>>('/v1/community/my-posts', { params }),
+
+    /** 编辑页回填（含 Markdown 原文） */
+    myPostDetail: (id: number) => api.get<CommunityArticleDetail>(`/v1/community/my-posts/${id}`),
+
+    /** 社区图片上传（正文插图 / 封面） */
+    uploadImage: (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return api.post<{ url: string }>('/v1/community/files/image', fd)
+    },
+
+    /** 更新社区资料（个人签名；昵称/邮箱/手机/头像走门户账号接口） */
+    updateSignature: (signature: string) => api.put<void>('/v1/community/profile', { signature }),
 
     /** 举报 */
     report: (body: { targetType: 'comment' | 'article' | 'user'; targetId: number; reason: string; detail?: string }) =>

@@ -6,31 +6,37 @@ import com.mengy.tools.common.Result;
 import com.mengy.tools.common.ResultCode;
 import com.mengy.tools.common.exception.BusinessException;
 import com.mengy.tools.dto.CommunityArticleDTO;
+import com.mengy.tools.dto.CommunityBoardDTO;
 import com.mengy.tools.dto.CommunityArticleDetailDTO;
 import com.mengy.tools.dto.CommunityCommentDTO;
 import com.mengy.tools.dto.CommunitySidebarDTO;
-import com.mengy.tools.dto.CommunityTagDTO;
 import com.mengy.tools.dto.CommunityUserCommentDTO;
+import com.mengy.tools.dto.CommunityPostDTO;
+import com.mengy.tools.dto.CommunityProfileUpdateRequest;
+import com.mengy.tools.dto.PostCreateRequest;
 import com.mengy.tools.dto.CommunityUserProfileDTO;
 import com.mengy.tools.dto.CommentCreateRequest;
 import com.mengy.tools.dto.FollowRequest;
 import com.mengy.tools.dto.ReactionRequest;
 import com.mengy.tools.dto.ReportCreateRequest;
+import com.mengy.tools.mapper.BlogCategoryMapper;
 import com.mengy.tools.mapper.CommunityArticleMapper;
 import com.mengy.tools.mapper.CommunityCommentMapper;
-import com.mengy.tools.mapper.CommunityTagMapper;
 import com.mengy.tools.mapper.CommunityUserMapper;
 import com.mengy.tools.entity.CommunityNotification;
 import com.mengy.tools.entity.SysUser;
 import com.mengy.tools.mapper.SysUserMapper;
 import com.mengy.tools.service.CommunityInteractService;
+import com.mengy.tools.service.CommunityPostService;
 import com.mengy.tools.service.CommunityWriteService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +44,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -67,10 +74,11 @@ public class CommunityPortalController {
     private final CommunityArticleMapper articleMapper;
     private final CommunityCommentMapper commentMapper;
     private final CommunityUserMapper userMapper;
-    private final CommunityTagMapper tagMapper;
     private final CommunityWriteService writeService;
     private final CommunityInteractService interactService;
     private final SysUserMapper sysUserMapper;
+    private final CommunityPostService postService;
+    private final BlogCategoryMapper categoryMapper;
 
     private static int clampSize(int size) {
         return Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
@@ -91,7 +99,7 @@ public class CommunityPortalController {
     // ==================== 文章 ====================
 
     /**
-     * 文章列表：社区首页/分类页/标签页/搜索结果共用。
+     * 文章列表：社区首页/板块页/搜索结果共用。
      *
      * @param sort latest（默认，发布时间倒序） / hot（评论数、浏览数倒序）
      */
@@ -104,7 +112,7 @@ public class CommunityPortalController {
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "latest") String sort) {
         Page<CommunityArticleDTO> p = new Page<>(clampPage(page), clampSize(size));
-        return Result.ok(articleMapper.selectCommunityPage(p, categoryId, tagId, trimToNull(keyword), sort));
+        return Result.ok(articleMapper.selectCommunityPage(p, categoryId, trimToNull(keyword), sort));
     }
 
     /** 文章详情（仅已发布）。阅读量由前端调用既有 /api/v1/track/view 上报，此处不自增。 */
@@ -178,28 +186,7 @@ public class CommunityPortalController {
         return Result.ok(commentMapper.selectUserCommentPage(p, id));
     }
 
-    // ==================== 标签 / 搜索 / 侧栏 ====================
-
-    /** 全部标签（含文章数）。 */
-    @GetMapping("/tags")
-    public Result<List<CommunityTagDTO>> tags() {
-        return Result.ok(tagMapper.selectTagList());
-    }
-
-    /** 标签下的文章（前端用 slug 构造 SEO 友好 URL）。 */
-    @GetMapping("/tags/{slug}/articles")
-    public Result<IPage<CommunityArticleDTO>> tagArticles(
-            @PathVariable String slug,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "latest") String sort) {
-        Long tagId = tagMapper.selectIdBySlug(slug);
-        if (tagId == null) {
-            throw new BusinessException(ResultCode.NOT_FOUND, "标签不存在");
-        }
-        Page<CommunityArticleDTO> p = new Page<>(clampPage(page), clampSize(size));
-        return Result.ok(articleMapper.selectCommunityPage(p, null, tagId, null, sort));
-    }
+    // ==================== 板块 / 搜索 / 侧栏 ====================
 
     /**
      * 搜索：优先走 ngram 全文索引（标题+摘要+正文，相关度排序）；
@@ -210,8 +197,7 @@ public class CommunityPortalController {
             @RequestParam(name = "q", required = false) String q,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Long tagId) {
+            @RequestParam(required = false) Long categoryId) {
         String keyword = trimToNull(q);
         Page<CommunityArticleDTO> p = new Page<>(clampPage(page), clampSize(size));
         if (keyword == null) {
@@ -219,25 +205,24 @@ public class CommunityPortalController {
         }
         if (fulltextAvailable) {
             try {
-                return Result.ok(articleMapper.selectSearchPage(p, keyword, categoryId, tagId));
+                return Result.ok(articleMapper.selectSearchPage(p, keyword, categoryId));
             } catch (Exception e) {
                 fulltextAvailable = false;
                 log.warn("全文索引不可用，搜索降级为 LIKE（请确认已执行 mengy_tools_community_search.sql）：{}",
                         e.getMessage());
             }
         }
-        return Result.ok(articleMapper.selectCommunityPage(p, categoryId, tagId, keyword, "latest"));
+        return Result.ok(articleMapper.selectCommunityPage(p, categoryId, keyword, "latest"));
     }
 
-    /** 侧栏聚合：站点统计 + 热门标签 + 活跃用户，一次请求喂满右侧栏。 */
+    /** 侧栏聚合：站点统计 + 板块导航 + 活跃用户，一次请求喂满右侧栏。 */
     @GetMapping("/sidebar")
     public Result<CommunitySidebarDTO> sidebar() {
         CommunitySidebarDTO dto = new CommunitySidebarDTO();
         dto.setArticleCount(articleMapper.countPublished());
         dto.setCommentCount(commentMapper.countByStatus(1));
         dto.setUserCount(userMapper.countUsers());
-        dto.setTagCount(tagMapper.countTags());
-        dto.setHotTags(tagMapper.selectHotTags(10));
+        dto.setBoards(articleMapper.selectBoardList());
         dto.setActiveUsers(userMapper.selectActiveUsers(8));
         return Result.ok(dto);
     }
@@ -281,7 +266,7 @@ public class CommunityPortalController {
         return Result.ok(interactService.reactedIds(requireLogin().getId(), targetType, type, ids));
     }
 
-    /** 关注 / 取关（用户或标签） */
+    /** 关注 / 取关（用户） */
     @PostMapping("/follows")
     public Result<Map<String, Object>> follow(@RequestBody FollowRequest req) {
         return Result.ok(interactService.toggleFollow(requireLogin().getId(), req));
@@ -292,6 +277,13 @@ public class CommunityPortalController {
     public Result<Map<String, Object>> followState(@RequestParam String targetType,
                                                    @RequestParam Long targetId) {
         return Result.ok(interactService.followState(requireLogin().getId(), targetType, targetId));
+    }
+
+    /** 更新社区资料（个人签名） */
+    @PutMapping("/profile")
+    public Result<Void> updateProfile(@RequestBody CommunityProfileUpdateRequest req) {
+        writeService.updateSignature(requireLogin().getId(), req.getSignature());
+        return Result.ok();
     }
 
     /** 举报评论/文章/用户 */
@@ -321,6 +313,80 @@ public class CommunityPortalController {
     @PostMapping("/notifications/read")
     public Result<Integer> markRead() {
         return Result.ok(interactService.markAllRead(requireLogin().getId()));
+    }
+
+    /** 板块列表（分类即板块）：含帖子数与最近一篇，供板块页与侧栏使用 */
+    @GetMapping("/boards")
+    public Result<List<CommunityBoardDTO>> boards() {
+        return Result.ok(articleMapper.selectBoardList());
+    }
+
+    /** 板块列表（发帖时选择板块用；与门户共用 blog_category 表） */
+    @GetMapping("/categories")
+    public Result<List<Map<String, Object>>> categories() {
+        return Result.ok(categoryMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.mengy.tools.entity.BlogCategory>()
+                                .orderByAsc(com.mengy.tools.entity.BlogCategory::getSort)
+                                .orderByAsc(com.mengy.tools.entity.BlogCategory::getId))
+                .stream()
+                .map(c -> {
+                    Map<String, Object> item = new java.util.LinkedHashMap<>();
+                    item.put("id", c.getId());
+                    item.put("name", c.getName());
+                    item.put("slug", c.getSlug());
+                    return item;
+                })
+                .toList());
+    }
+
+    // ==================== 发帖（需登录，P5） ====================
+
+    /** 发表帖子：Markdown 正文服务端渲染并消毒；新用户/含链接/敏感词进待审 */
+    @PostMapping("/posts")
+    public Result<Map<String, Object>> createPost(@RequestBody PostCreateRequest req) {
+        SysUser me = requireLogin();
+        Long id = postService.createPost(me.getId(), req);
+        CommunityPostDTO brief = articleMapper.selectOwnPostBrief(id);
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("id", id);
+        data.put("status", brief == null ? null : brief.getStatus());
+        return Result.ok(data);
+    }
+
+    /** 编辑自己的帖子 */
+    @PutMapping("/posts/{id}")
+    public Result<Void> updatePost(@PathVariable Long id, @RequestBody PostCreateRequest req) {
+        postService.updateOwnPost(requireLogin().getId(), id, req);
+        return Result.ok();
+    }
+
+    /** 删除自己的帖子（软删） */
+    @DeleteMapping("/posts/{id}")
+    public Result<Void> deletePost(@PathVariable Long id) {
+        postService.deleteOwnPost(requireLogin().getId(), id);
+        return Result.ok();
+    }
+
+    /** 我的帖子（含待审/已屏蔽） */
+    @GetMapping("/my-posts")
+    public Result<IPage<CommunityPostDTO>> myPosts(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer status) {
+        return Result.ok(postService.myPosts(requireLogin().getId(), page, size, status));
+    }
+
+    /** 编辑页回填：取自己的帖子详情（含 Markdown 原文，不限状态） */
+    @GetMapping("/my-posts/{id}")
+    public Result<CommunityArticleDetailDTO> myPostDetail(@PathVariable Long id) {
+        return Result.ok(postService.ownPostDetail(requireLogin().getId(), id));
+    }
+
+    /** 社区图片上传（正文插图 / 封面）：登录 + 限频 + 类型与大小校验 */
+    @PostMapping("/files/image")
+    public Result<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
+        String url = postService.uploadImage(requireLogin().getId(), file);
+        return Result.ok(Map.of("url", url));
     }
 
     // ==================== 内部工具 ====================

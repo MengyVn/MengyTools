@@ -21,11 +21,8 @@ public class CommunitySidebarDTO implements Serializable {
     /** 注册用户数 */
     private Long userCount;
 
-    /** 标签数 */
-    private Long tagCount;
-
-    /** 热门标签（按文章数倒序） */
-    private List<CommunityTagDTO> hotTags;
+    /** 板块列表（含帖子数，用于侧栏导航） */
+    private List<CommunityBoardDTO> boards;
 
     /** 活跃用户（按评论数倒序） */
     private List<CommunityUserBriefDTO> activeUsers;

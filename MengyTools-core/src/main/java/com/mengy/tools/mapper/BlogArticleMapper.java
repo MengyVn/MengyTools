@@ -46,5 +46,12 @@ public interface BlogArticleMapper extends BaseMapper<BlogArticle> {
      */
     @Update("UPDATE blog_article SET deleted = 0 WHERE id = #{id}")
     int restore(@Param("id") Long id);
-}
 
+    /**
+     * 是否站主博客（content_type=blog）。
+     * 社区用户帖是同一张表里的 content_type=community，门户详情据此拒绝访问。
+     */
+    @org.apache.ibatis.annotations.Select(
+            "SELECT COUNT(*) FROM blog_article WHERE id = #{id} AND content_type = 'blog' AND deleted = 0")
+    int countBlogArticle(@org.apache.ibatis.annotations.Param("id") Long id);
+}

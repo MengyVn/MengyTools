@@ -59,6 +59,8 @@ public class ArticleAdminController {
             @RequestParam(required = false) Long categoryId) {
         Page<BlogArticle> p = new Page<>(page, size);
         LambdaQueryWrapper<BlogArticle> wrapper = new LambdaQueryWrapper<BlogArticle>()
+                // 仅站主博客；社区用户帖在「社区管理 → 帖子管理」中处理
+                .apply("content_type = 'blog'")
                 .orderByDesc(BlogArticle::getIsTop)
                 .orderByDesc(BlogArticle::getCreateTime);
         if (title != null && !title.isBlank()) {

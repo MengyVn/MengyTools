@@ -12,7 +12,6 @@ import com.mengy.tools.mapper.CommunityCommentMapper;
 import com.mengy.tools.mapper.CommunityFollowMapper;
 import com.mengy.tools.mapper.CommunityNotificationMapper;
 import com.mengy.tools.mapper.CommunityReactionMapper;
-import com.mengy.tools.mapper.CommunityTagMapper;
 import com.mengy.tools.mapper.CommunityUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +36,8 @@ public class CommunityInteractService {
 
     private static final Set<String> TARGET_TYPES = Set.of("article", "comment");
     private static final Set<String> REACTION_TYPES = Set.of("like", "favorite");
-    private static final Set<String> FOLLOW_TARGET_TYPES = Set.of("user", "tag");
+    /** 关注对象类型：标签维度已移除，只保留关注用户 */
+    private static final Set<String> FOLLOW_TARGET_TYPES = Set.of("user");
 
     private final CommunityGuardService guard;
     private final CommunityReactionMapper reactionMapper;
@@ -46,7 +46,6 @@ public class CommunityInteractService {
     private final CommunityArticleMapper articleMapper;
     private final CommunityCommentMapper commentMapper;
     private final CommunityUserMapper userMapper;
-    private final CommunityTagMapper tagMapper;
 
     /**
      * 点赞 / 收藏（开关式）。
@@ -110,17 +109,11 @@ public class CommunityInteractService {
         if (targetType == null || targetId == null || !FOLLOW_TARGET_TYPES.contains(targetType)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "关注参数不合法");
         }
-        if ("user".equals(targetType)) {
-            if (userId.equals(targetId)) {
-                throw new BusinessException(ResultCode.BAD_REQUEST, "不能关注自己");
-            }
-            if (userMapper.selectUserState(targetId) == null) {
-                throw new BusinessException(ResultCode.NOT_FOUND, "用户不存在");
-            }
-        } else {
-            if (tagMapper.selectTagList().stream().noneMatch(t -> t.getId().equals(targetId))) {
-                throw new BusinessException(ResultCode.NOT_FOUND, "标签不存在");
-            }
+        if (userId.equals(targetId)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "不能关注自己");
+        }
+        if (userMapper.selectUserState(targetId) == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "用户不存在");
         }
         guard.checkInteractRate(userId);
 

@@ -6,6 +6,7 @@ import com.mengy.tools.common.Result;
 import com.mengy.tools.common.ResultCode;
 import com.mengy.tools.common.exception.BusinessException;
 import com.mengy.tools.dto.CommunityCommentAdminDTO;
+import com.mengy.tools.dto.CommunityPostDTO;
 import com.mengy.tools.dto.CommunityReportDTO;
 import com.mengy.tools.dto.CommunityUserAdminDTO;
 import com.mengy.tools.entity.CommunityAuditLog;
@@ -13,8 +14,10 @@ import com.mengy.tools.entity.SysUser;
 import com.mengy.tools.mapper.CommunityAuditLogMapper;
 import com.mengy.tools.mapper.CommunityCommentMapper;
 import com.mengy.tools.mapper.CommunityReportMapper;
+import com.mengy.tools.mapper.CommunityArticleMapper;
 import com.mengy.tools.mapper.CommunityUserMapper;
 import com.mengy.tools.mapper.SysUserMapper;
+import com.mengy.tools.service.CommunityPostService;
 import com.mengy.tools.service.CommunityWriteService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
@@ -53,8 +56,10 @@ public class CommunityAdminController {
     private final CommunityReportMapper reportMapper;
     private final CommunityAuditLogMapper auditLogMapper;
     private final CommunityUserMapper userMapper;
+    private final CommunityArticleMapper articleMapper;
     private final CommunityWriteService writeService;
     private final SysUserMapper sysUserMapper;
+    private final CommunityPostService postService;
 
     private static int clampSize(int size) {
         return Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
@@ -123,6 +128,8 @@ public class CommunityAdminController {
         data.put("commentPublished", commentMapper.countByStatus(1));
         data.put("commentBlocked", commentMapper.countByStatus(2));
         data.put("reportPending", reportMapper.countPending());
+        data.put("postPending", articleMapper.countPendingPosts());
+        data.put("postTotal", articleMapper.countCommunityPosts());
         return Result.ok(data);
     }
 
@@ -201,6 +208,41 @@ public class CommunityAdminController {
         writeService.banUser(me.getId(), me.getNickname(), resolveClientIp(request),
                 id, req.isBanned(), req.getNote());
         return Result.ok(req.isBanned() ? "已封禁" : "已解封");
+    }
+
+    // ==================== 帖文治理 ====================
+
+    /** 帖子列表（含待审） */
+    @GetMapping("/posts")
+    @PreAuthorize("@ss.hasPermi('community:post:list')")
+    public Result<IPage<CommunityPostDTO>> posts(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String keyword) {
+        return Result.ok(postService.adminPosts(page, size, status, keyword));
+    }
+
+    /** 帖文审核：0待审 1已发布 2已屏蔽 */
+    @PutMapping("/posts/{id}/status")
+    @PreAuthorize("@ss.hasPermi('community:post:audit')")
+    public Result<Void> auditPost(@PathVariable Long id,
+                                  @RequestBody CommentAuditRequest req,
+                                  HttpServletRequest request) {
+        SysUser me = requireLogin();
+        postService.auditPost(me.getId(), me.getNickname(), resolveClientIp(request), id, req.getStatus(), req.getNote());
+        return Result.ok();
+    }
+
+    /** 删除帖子（软删，写操作日志） */
+    @DeleteMapping("/posts/{id}")
+    @PreAuthorize("@ss.hasPermi('community:post:delete')")
+    public Result<Void> deletePost(@PathVariable Long id,
+                                   @RequestParam(required = false) String note,
+                                   HttpServletRequest request) {
+        SysUser me = requireLogin();
+        postService.deletePostByAdmin(me.getId(), me.getNickname(), resolveClientIp(request), id, note);
+        return Result.ok();
     }
 
     // ==================== 内部工具 ====================
