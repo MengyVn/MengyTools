@@ -32,6 +32,10 @@ dist-ssr/
 .env
 .env.*
 !.env.example
+# 前端 .env 只含接口前缀等非敏感配置，必须入库：
+# 否则新机器克隆后 VITE_APP_BASE_API 为空，管理端请求会丢 /api 前缀 → 404
+!MengyTools-admin/.env.development
+!MengyTools-admin/.env.production
 application-local.yml
 application-local.properties
 

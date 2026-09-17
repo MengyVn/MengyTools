@@ -4,7 +4,8 @@ import { useUserStore } from '@/store/user'
 import router from '@/router'
 
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_APP_BASE_API,
+  // 兜底 '/api'：.env 缺失时不能退化成同源根路径（请求会打到 Vite 自身 → 404）
+  baseURL: import.meta.env.VITE_APP_BASE_API || '/api',
   timeout: 15000
 })
 
