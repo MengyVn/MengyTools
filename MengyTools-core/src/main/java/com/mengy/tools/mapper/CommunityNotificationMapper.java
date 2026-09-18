@@ -3,10 +3,13 @@ package com.mengy.tools.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mengy.tools.entity.CommunityNotification;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
 
 /**
  * 社区通知 Mapper：写入用 BaseMapper，读取用下面几个定制查询。
@@ -36,4 +39,22 @@ public interface CommunityNotificationMapper extends BaseMapper<CommunityNotific
     IPage<CommunityNotification> selectMyPage(IPage<CommunityNotification> page,
                                               @Param("userId") Long userId,
                                               @Param("unreadOnly") boolean unreadOnly);
+
+    /**
+     * 批量写入（粉丝通知拉群发用）：一条 INSERT 多组 values，避免 N 次往返。
+     * 调用方负责分片（见 CommunityNotifyService.BATCH_SIZE）。
+     */
+    @Insert("""
+        <script>
+        INSERT INTO community_notification
+            (user_id, type, actor_id, actor_name, actor_avatar, article_id, comment_id,
+             title, content, is_read, deleted, create_time)
+        VALUES
+        <foreach collection="list" item="n" separator=",">
+            (#{n.userId}, #{n.type}, #{n.actorId}, #{n.actorName}, #{n.actorAvatar},
+             #{n.articleId}, #{n.commentId}, #{n.title}, #{n.content}, 0, 0, NOW())
+        </foreach>
+        </script>
+        """)
+    int insertBatch(@Param("list") List<CommunityNotification> list);
 }

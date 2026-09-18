@@ -4,14 +4,13 @@ import com.mengy.tools.common.ResultCode;
 import com.mengy.tools.common.exception.BusinessException;
 import com.mengy.tools.dto.CommentCreateRequest;
 import com.mengy.tools.dto.CommunityCommentDTO;
+import com.mengy.tools.dto.CommunityUserBriefDTO;
 import com.mengy.tools.dto.CommunityUserStateDTO;
 import com.mengy.tools.dto.ReportCreateRequest;
 import com.mengy.tools.entity.CommunityComment;
-import com.mengy.tools.entity.CommunityNotification;
 import com.mengy.tools.entity.CommunityReport;
 import com.mengy.tools.mapper.CommunityArticleMapper;
 import com.mengy.tools.mapper.CommunityCommentMapper;
-import com.mengy.tools.mapper.CommunityNotificationMapper;
 import com.mengy.tools.mapper.CommunityReportMapper;
 import com.mengy.tools.mapper.CommunityUserMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -36,10 +36,10 @@ import java.util.Set;
 public class CommunityWriteService {
 
     private final CommunityGuardService guard;
+    private final CommunityNotifyService notifyService;
     private final CommunityArticleMapper articleMapper;
     private final CommunityCommentMapper commentMapper;
     private final CommunityReportMapper reportMapper;
-    private final CommunityNotificationMapper notificationMapper;
     private final CommunityAuditService auditService;
     private final CommunityUserMapper userMapper;
 
@@ -115,22 +115,39 @@ public class CommunityWriteService {
             articleMapper.recountArticleStats(req.getArticleId());
         }
 
-        // 通知：先通知被回复者，再通知 @提及（去重、跳过自己）
+        // 通知：被回复者 → 楼主 → @提及，同一人只发一条（优先级按此顺序）
+        //
+        // 刻意不给「关注者」推送评论通知：关注几个人就会被评论流淹没；
+        // 只有「发布新帖」才推送给粉丝（见 CommunityNotifyService.notifyPostPublished）。
+        CommunityUserBriefDTO actor = new CommunityUserBriefDTO();
+        actor.setId(userId);
+        actor.setNickname(nickname == null ? "" : nickname);
+        actor.setAvatar(avatar == null ? "" : avatar);
+
+        Set<Long> notified = new HashSet<>();
         if (parent != null && !userId.equals(parent.getAuthorId())) {
-            notify(parent.getAuthorId(), "reply", userId, user.getId(), req.getArticleId(), comment.getId(),
+            notifyService.notify(parent.getAuthorId(), "reply", actor, req.getArticleId(), comment.getId(),
                     "有人在评论中回复了你", abbreviate(text));
+            notified.add(parent.getAuthorId());
+        }
+        // 楼主通知只在「新楼层」时发：楼中楼的收件人是被回复的人，不该再打扰楼主
+        if (parent == null) {
+            Long postAuthorId = articleMapper.selectAuthorId(req.getArticleId());
+            if (postAuthorId != null && !notified.contains(postAuthorId)) {
+                notifyService.notify(postAuthorId, "comment", actor, req.getArticleId(), comment.getId(),
+                        "有人评论了你的帖子", abbreviate(text));
+                notified.add(postAuthorId);
+            }
         }
         Set<String> mentions = guard.extractMentions(text);
         for (String mentionName : mentions) {
             Long mentionId = userMapper.selectIdByNickname(mentionName);
-            if (mentionId == null || mentionId.equals(userId)) {
+            if (mentionId == null || alreadyNotified(notified, mentionId)) {
                 continue;
             }
-            if (parent != null && mentionId.equals(parent.getAuthorId())) {
-                continue; // 已经发过回复通知
-            }
-            notify(mentionId, "mention", userId, user.getId(), req.getArticleId(), comment.getId(),
+            notifyService.notify(mentionId, "mention", actor, req.getArticleId(), comment.getId(),
                     "有人在评论中提到了你", abbreviate(text));
+            notified.add(mentionId);
         }
 
         CommunityCommentDTO dto = new CommunityCommentDTO();
@@ -336,22 +353,9 @@ public class CommunityWriteService {
         auditService.write(operatorId, operatorName, action, targetType, targetId, before, after, note, ip);
     }
 
-    private void notify(Long toUserId, String type, Long actorId, Long actorUserId,
-                        Long articleId, Long commentId, String title, String content) {
-        if (toUserId == null || toUserId.equals(actorUserId)) {
-            return;
-        }
-        CommunityNotification n = new CommunityNotification();
-        n.setUserId(toUserId);
-        n.setType(type);
-        n.setActorId(actorId);
-        n.setArticleId(articleId == null ? 0L : articleId);
-        n.setCommentId(commentId == null ? 0L : commentId);
-        n.setTitle(title);
-        n.setContent(content);
-        n.setIsRead(0);
-        n.setDeleted(0);
-        notificationMapper.insert(n);
+    /** 同一人只收一条通知：已在本次分发中通知过（或被回复者已通知）就跳过 */
+    private static boolean alreadyNotified(Set<Long> notified, Long userId) {
+        return userId == null || notified.contains(userId);
     }
 
     private static String abbreviate(String s) {

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mengy.tools.common.ResultCode;
 import com.mengy.tools.common.exception.BusinessException;
 import com.mengy.tools.dto.FollowRequest;
+import com.mengy.tools.dto.CommunityFollowUserDTO;
 import com.mengy.tools.dto.ReactionRequest;
 import com.mengy.tools.entity.CommunityNotification;
 import com.mengy.tools.mapper.CommunityArticleMapper;
@@ -40,6 +41,7 @@ public class CommunityInteractService {
     private static final Set<String> FOLLOW_TARGET_TYPES = Set.of("user");
 
     private final CommunityGuardService guard;
+    private final CommunityNotifyService notifyService;
     private final CommunityReactionMapper reactionMapper;
     private final CommunityFollowMapper followMapper;
     private final CommunityNotificationMapper notificationMapper;
@@ -79,18 +81,10 @@ public class CommunityInteractService {
         // 点赞评论时给评论作者发通知（不给自己发）
         if (active && "like".equals(type) && "comment".equals(targetType)) {
             var c = commentMapper.selectBrief(targetId);
-            if (c != null && !userId.equals(c.getAuthorId())) {
-                CommunityNotification n = new CommunityNotification();
-                n.setUserId(c.getAuthorId());
-                n.setType("like");
-                n.setActorId(userId);
-                n.setArticleId(c.getArticleId());
-                n.setCommentId(targetId);
-                n.setTitle("有人赞了你的评论");
-                n.setContent(c.getContent() == null ? "" : abbreviate(c.getContent()));
-                n.setIsRead(0);
-                n.setDeleted(0);
-                notificationMapper.insert(n);
+            if (c != null) {
+                notifyService.notify(c.getAuthorId(), "like", notifyService.actorOf(userId),
+                        c.getArticleId(), targetId, "有人赞了你的评论",
+                        c.getContent() == null ? "" : abbreviate(c.getContent()));
             }
         }
 
@@ -100,7 +94,7 @@ public class CommunityInteractService {
         return out;
     }
 
-    /** 关注 / 取关（用户或标签），幂等开关 */
+    /** 关注 / 取关（幂等开关） */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> toggleFollow(Long userId, FollowRequest req) {
         guard.assertCanWrite(guard.loadUser(userId));
@@ -126,6 +120,13 @@ public class CommunityInteractService {
             active = true;
         }
 
+        // 关注成功才通知（取关不通知）；重新关注会再通知一次，属预期行为
+        if (active) {
+            var actor = notifyService.actorOf(userId);
+            notifyService.notify(targetId, "follow", actor, 0L, 0L, "有人关注了你",
+                    actor == null ? "" : actor.getSignature());
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("active", active);
         out.put("count", followMapper.countByTarget(targetType, targetId));
@@ -142,6 +143,21 @@ public class CommunityInteractService {
         }
         out.put("count", followMapper.countByTarget(targetType, targetId));
         return out;
+    }
+
+    /**
+     * TA 关注的人（公开；viewerId 为 null 表示未登录，此时 followed 恒为 false）。
+     * 只返回仍然有效的账号，且不返回登录名。
+     */
+    public IPage<CommunityFollowUserDTO> following(Long userId, Long viewerId, int page, int size) {
+        return followMapper.selectFollowingPage(new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), 50)),
+                userId, viewerId == null ? 0L : viewerId);
+    }
+
+    /** 关注 TA 的人（粉丝列表，分页） */
+    public IPage<CommunityFollowUserDTO> followers(Long userId, Long viewerId, int page, int size) {
+        return followMapper.selectFollowerPage(new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), 50)),
+                userId, viewerId == null ? 0L : viewerId);
     }
 
     /** 我的互动状态（点赞/收藏按钮初始态，可一次问多类） */

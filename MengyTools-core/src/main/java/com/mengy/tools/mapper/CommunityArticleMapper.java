@@ -128,6 +128,10 @@ public interface CommunityArticleMapper {
     @Select("SELECT allow_comment FROM blog_article WHERE id = #{id} AND deleted = 0")
     Integer selectAllowComment(@Param("id") Long id);
 
+    /** 帖子作者（评论时给楼主发通知用） */
+    @Select("SELECT author_id FROM blog_article WHERE id = #{id} AND deleted = 0")
+    Long selectAuthorId(@Param("id") Long id);
+
     /**
      * 重算并回填文章的互动计数（评论数/点赞数/收藏数）。
      *
@@ -205,9 +209,9 @@ public interface CommunityArticleMapper {
         """)
     int updatePostStatus(@Param("id") Long id, @Param("status") Integer status);
 
-    /** 帖子归属与状态（编辑/删除前的权限校验） */
+    /** 帖子归属与状态（编辑/删除前的权限校验、审核通过时推送粉丝通知） */
     @Select("""
-        SELECT id, author_id AS authorId, status, title
+        SELECT id, author_id AS authorId, status, title, summary
           FROM blog_article
          WHERE id = #{id} AND content_type = 'community' AND deleted = 0
         """)

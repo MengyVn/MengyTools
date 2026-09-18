@@ -89,11 +89,21 @@ useSeoMeta({
           <ul v-if="data?.records?.length" class="list">
             <li v-for="n in data.records" :key="n.id" class="row" :class="{ unread: !n.isRead }">
               <span class="type">{{ NOTIFICATION_TYPE_TEXT[n.type] || n.type }}</span>
+              <NuxtLink
+                v-if="n.actorId && n.type !== 'system'"
+                :to="`/community/users/${n.actorId}`"
+                class="actor"
+                :title="n.actorName || '查看主页'"
+              >
+                <img v-if="n.actorAvatar" :src="n.actorAvatar" :alt="n.actorName" class="actor-avatar" />
+                <span v-else class="actor-avatar actor-avatar-text">{{ (n.actorName || '?').slice(0, 1).toUpperCase() }}</span>
+              </NuxtLink>
               <div class="body">
                 <NuxtLink :to="notificationTarget(n)" class="row-title">
                   {{ n.title }}
                   <span v-if="!n.isRead" class="dot" />
                 </NuxtLink>
+                <span v-if="n.actorName" class="actor-name">{{ n.actorName }}</span>
                 <p v-if="n.content" class="row-content">{{ n.content }}</p>
               </div>
               <time class="time">{{ formatRelativeTime(n.createTime) }}</time>
@@ -198,6 +208,30 @@ useSeoMeta({
   background: var(--c-surface);
   color: var(--c-text-muted);
   font-size: 12px;
+}
+.actor {
+  flex-shrink: 0;
+  line-height: 0;
+}
+.actor-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.actor-avatar-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+.actor-name {
+  margin-left: 6px;
+  color: var(--c-text-muted);
+  font-size: 12.5px;
 }
 .body {
   flex: 1;

@@ -18,4 +18,7 @@ public class CommunityUserBriefDTO implements Serializable {
 
     /** 评论数（侧栏排序依据） */
     private Long commentCount;
+
+    /** 个人签名（写关注通知时作为内容摘要） */
+    private String signature;
 }

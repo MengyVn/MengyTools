@@ -23,8 +23,9 @@ import java.util.List;
 public interface CommunityUserMapper {
 
     /**
-     * 公开用户主页（含统计：评论数、文章数、累计获赞）。
+     * 公开用户主页（含统计：评论数、文章数、累计获赞、关注数、粉丝数）。
      * 不返回 username，避免账户枚举。
+     * 关注/粉丝计数过滤掉已注销与被封禁的账号，口径与关注/粉丝列表一致。
      */
     @Select("""
         SELECT u.id, u.nickname, u.avatar, u.signature, u.create_time,
@@ -33,11 +34,21 @@ public interface CommunityUserMapper {
                (SELECT COUNT(*) FROM blog_article a
                  WHERE a.author_id = u.id AND a.deleted = 0 AND a.status = 1) AS article_count,
                (SELECT IFNULL(SUM(c.like_count), 0) FROM community_comment c
-                 WHERE c.author_id = u.id AND c.deleted = 0 AND c.status = 1) AS received_like_count
+                 WHERE c.author_id = u.id AND c.deleted = 0 AND c.status = 1) AS received_like_count,
+               (SELECT COUNT(*) FROM community_follow f
+                  JOIN sys_user tu ON tu.id = f.target_id AND tu.deleted = 0 AND tu.status = 1
+                 WHERE f.user_id = u.id AND f.target_type = 'user') AS following_count,
+               (SELECT COUNT(*) FROM community_follow f
+                  JOIN sys_user fu ON fu.id = f.user_id AND fu.deleted = 0 AND fu.status = 1
+                 WHERE f.target_type = 'user' AND f.target_id = u.id) AS follower_count
         FROM sys_user u
         WHERE u.id = #{id} AND u.deleted = 0 AND u.status = 1
         """)
     CommunityUserProfileDTO selectPublicProfile(@Param("id") Long id);
+
+    /** 触发者简要资料（昵称/头像/签名），写通知时冗余进通知行 */
+    @Select("SELECT id, nickname, avatar, signature FROM sys_user WHERE id = #{id} AND deleted = 0")
+    CommunityUserBriefDTO selectBriefProfile(@Param("id") Long id);
 
     /** 活跃用户（按已发布评论数倒序）。 */
     @Select("""

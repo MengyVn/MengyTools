@@ -58,6 +58,7 @@ public class CommunityPostService {
     private final CommunityGuardService guard;
     private final MarkdownService markdownService;
     private final CommunityAuditService auditService;
+    private final CommunityNotifyService notifyService;
     private final CommunityArticleMapper articleMapper;
 
     @Value("${mengy.upload.dir}")
@@ -90,6 +91,11 @@ public class CommunityPostService {
 
         articleMapper.insertPost(post);
         log.info("社区发帖：id={} author={} status={} title={}", post.getId(), userId, post.getStatus(), title);
+
+        // 已发布就推送给粉丝；待审的等审核通过时再推（见 auditPost），避免泄露未公开内容
+        if (post.getStatus() != null && post.getStatus() == 1) {
+            notifyService.notifyPostPublished(userId, post.getId(), title, post.getSummary());
+        }
         return post.getId();
     }
 
@@ -174,6 +180,11 @@ public class CommunityPostService {
         articleMapper.updatePostStatus(postId, status);
         auditService.write(operatorId, operatorName, "post.audit", "post", postId,
                 "status=" + before, "status=" + status, note, ip);
+
+        // 从「非已发布」变为「已发布」才推送粉丝：审核通过/解除屏蔽各推一次，重复点通过不会重复打扰
+        if (status == 1 && before != 1) {
+            notifyService.notifyPostPublished(brief.getAuthorId(), postId, brief.getTitle(), brief.getSummary());
+        }
     }
 
     /** 后台删除帖子（软删） */

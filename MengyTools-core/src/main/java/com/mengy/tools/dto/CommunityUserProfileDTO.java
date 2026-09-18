@@ -32,4 +32,10 @@ public class CommunityUserProfileDTO implements Serializable {
 
     /** 其评论累计获赞数 */
     private Long receivedLikeCount;
+
+    /** 关注了多少人 */
+    private Long followingCount;
+
+    /** 有多少粉丝 */
+    private Long followerCount;
 }

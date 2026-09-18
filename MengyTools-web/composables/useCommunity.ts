@@ -74,6 +74,20 @@ export interface CommunityUserProfile {
   commentCount?: number
   articleCount?: number
   receivedLikeCount?: number
+  /** 关注了多少人 */
+  followingCount?: number
+  /** 多少粉丝 */
+  followerCount?: number
+}
+
+/** 关注 / 粉丝列表项（followed=我是否已关注 TA） */
+export interface CommunityFollowUser {
+  id: number
+  nickname: string
+  avatar?: string
+  signature?: string
+  followed?: boolean
+  followTime?: string
 }
 
 export interface CommunityUserComment {
@@ -152,7 +166,7 @@ export const POST_STATUS_TEXT: Record<number, string> = {
 /** 通知项（字段对齐后端 CommunityNotification 实体） */
 export interface CommunityNotificationItem {
   id: number
-  type: 'reply' | 'mention' | 'like' | 'system' | string
+  type: 'reply' | 'comment' | 'mention' | 'like' | 'follow' | 'post' | 'system' | string
   actorId: number
   actorName?: string
   actorAvatar?: string
@@ -164,14 +178,24 @@ export interface CommunityNotificationItem {
   createTime: string
 }
 
-/** 通知类型的中文文案与跳转目标 */
-export const notificationTarget = (n: CommunityNotificationItem): string =>
-  n.articleId ? `/community/posts/${n.articleId}` : '/community'
+/**
+ * 通知类型的中文文案与跳转目标。
+ * 关注类通知没有文章，跳触发者的个人主页；其余跳相应帖子。
+ */
+export const notificationTarget = (n: CommunityNotificationItem): string => {
+  if (n.type === 'follow') {
+    return n.actorId ? `/community/users/${n.actorId}` : '/community'
+  }
+  return n.articleId ? `/community/posts/${n.articleId}` : '/community'
+}
 
 export const NOTIFICATION_TYPE_TEXT: Record<string, string> = {
   reply: '回复',
+  comment: '评论',
   mention: '提及',
   like: '点赞',
+  follow: '关注',
+  post: '新帖',
   system: '系统'
 }
 
@@ -201,6 +225,14 @@ export const useCommunity = () => {
 
     userComments: (id: number | string, params: { page?: number; size?: number } = {}) =>
       api.get<PageResult<CommunityUserComment>>(`/v1/community/users/${id}/comments`, { params }),
+
+    /** TA 关注的人（公开接口；登录后每行带 followed 标记） */
+    following: (id: number | string, params: { page?: number; size?: number } = {}) =>
+      api.get<PageResult<CommunityFollowUser>>(`/v1/community/users/${id}/following`, { params }),
+
+    /** 关注 TA 的人（粉丝列表） */
+    followers: (id: number | string, params: { page?: number; size?: number } = {}) =>
+      api.get<PageResult<CommunityFollowUser>>(`/v1/community/users/${id}/followers`, { params }),
 
     /** 板块列表（含帖子数与最近一篇） */
     boards: () => api.get<CommunityBoard[]>('/v1/community/boards'),
@@ -235,8 +267,8 @@ export const useCommunity = () => {
         `/v1/community/reactions/state/batch?targetType=${targetType}&type=${type}&ids=${ids.join(',')}`
       ),
 
-    /** 关注 / 取关（用户或标签） */
-    follow: (body: { targetType: 'user' | 'tag'; targetId: number }) =>
+    /** 关注 / 取关（幂等开关；关注成功会给对方发通知） */
+    follow: (body: { targetType: 'user'; targetId: number }) =>
       api.post<{ active: boolean; count: number }>('/v1/community/follows', body),
 
     /** 我的关注状态 */

@@ -9,6 +9,7 @@ import com.mengy.tools.dto.CommunityArticleDTO;
 import com.mengy.tools.dto.CommunityBoardDTO;
 import com.mengy.tools.dto.CommunityArticleDetailDTO;
 import com.mengy.tools.dto.CommunityCommentDTO;
+import com.mengy.tools.dto.CommunityFollowUserDTO;
 import com.mengy.tools.dto.CommunitySidebarDTO;
 import com.mengy.tools.dto.CommunityUserCommentDTO;
 import com.mengy.tools.dto.CommunityPostDTO;
@@ -184,6 +185,26 @@ public class CommunityPortalController {
         }
         Page<CommunityUserCommentDTO> p = new Page<>(clampPage(page), clampSize(size));
         return Result.ok(commentMapper.selectUserCommentPage(p, id));
+    }
+
+    /** TA 关注的人（公开；登录时带出「我是否已关注」标记，便于列表内直接关注） */
+    @GetMapping("/users/{id}/following")
+    public Result<IPage<CommunityFollowUserDTO>> userFollowing(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        assertUserExists(id);
+        return Result.ok(interactService.following(id, loginUserIdOrNull(), page, size));
+    }
+
+    /** 关注 TA 的人（粉丝列表，公开） */
+    @GetMapping("/users/{id}/followers")
+    public Result<IPage<CommunityFollowUserDTO>> userFollowers(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        assertUserExists(id);
+        return Result.ok(interactService.followers(id, loginUserIdOrNull(), page, size));
     }
 
     // ==================== 板块 / 搜索 / 侧栏 ====================
@@ -390,6 +411,27 @@ public class CommunityPortalController {
     }
 
     // ==================== 内部工具 ====================
+
+    /** 用户必须存在且可公开访问（关注/粉丝列表用） */
+    private void assertUserExists(Long id) {
+        if (userMapper.selectPublicProfile(id) == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "用户不存在");
+        }
+    }
+
+    /**
+     * 取当前登录用户 id；未登录返回 null。
+     * 用于「公开但登录后有额外信息」的接口（如关注/粉丝列表里的 followed 标记）。
+     */
+    private Long loginUserIdOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getName() == null
+                || "anonymousUser".equals(auth.getName())) {
+            return null;
+        }
+        SysUser user = sysUserMapper.selectByUsername(auth.getName());
+        return user == null ? null : user.getId();
+    }
 
     /** 取当前登录用户；未登录（或账号异常）直接 401 */
     private SysUser requireLogin() {
