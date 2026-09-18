@@ -13,9 +13,13 @@ import com.mengy.tools.entity.BlogArticle;
 import com.mengy.tools.entity.BlogCategory;
 import com.mengy.tools.mapper.BlogArticleMapper;
 import com.mengy.tools.mapper.BlogCategoryMapper;
+import com.mengy.tools.mapper.SysUserMapper;
+import com.mengy.tools.service.CommunityNotifyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +41,10 @@ import java.util.stream.Collectors;
  * 后台博客文章管理接口（需鉴权 + 权限校验）。
  * 权限标识与 sys_menu 中 article:list/query/add/edit/delete/publish 对齐。
  * 管理端可见所有状态（草稿/已发布/定时），与公开端 PortalController 区分。
+ *
+ * 作者归属：博客文章与社区帖子是同一份内容（同表，content_type 区分），
+ * 因此新建文章时把作者记为当前登录管理员，发布时按该作者的粉丝推送通知；
+ * 历史上 author_id 为 NULL 的文章在社区侧会显示为「匿名」，需要一次性回填。
  */
 @RestController
 @RequestMapping("/api/v1/admin/articles")
@@ -45,6 +53,8 @@ public class ArticleAdminController {
 
     private final BlogArticleMapper articleMapper;
     private final BlogCategoryMapper categoryMapper;
+    private final SysUserMapper sysUserMapper;
+    private final CommunityNotifyService notifyService;
 
     /**
      * 文章分页列表（管理端，支持按标题/状态筛选）。
@@ -140,7 +150,16 @@ public class ArticleAdminController {
         if (article.getContentFormat() == null || article.getContentFormat().isBlank()) {
             article.setContentFormat("markdown");
         }
+        // 作者归属：未显式指定时记为当前登录管理员（决定粉丝通知的触发者）
+        if (article.getAuthorId() == null) {
+            article.setAuthorId(currentUserId());
+        }
         articleMapper.insert(article);
+
+        if (article.getStatus() == 1) {
+            notifyService.notifyPostPublished(article.getAuthorId(), article.getId(),
+                    article.getTitle(), article.getSummary());
+        }
         return Result.ok(article.getId());
     }
 
@@ -161,6 +180,10 @@ public class ArticleAdminController {
         if (article.getContentFormat() == null || article.getContentFormat().isBlank()) {
             article.setContentFormat("markdown");
         }
+        // 作者只补空、不覆盖：老文章（author_id 为空）编辑后归到当前管理员
+        if (article.getAuthorId() == null) {
+            article.setAuthorId(exists.getAuthorId() != null ? exists.getAuthorId() : currentUserId());
+        }
         // 状态从草稿改为已发布时补 publishTime
         if (dto.getStatus() != null && dto.getStatus() == 1
                 && exists.getStatus() != null && exists.getStatus() != 1
@@ -168,6 +191,14 @@ public class ArticleAdminController {
             article.setPublishTime(LocalDateTime.now());
         }
         articleMapper.updateById(article);
+
+        // 从「非已发布」变为「已发布」才推粉丝，重复保存不会重复打扰
+        int before = exists.getStatus() == null ? -1 : exists.getStatus();
+        if (dto.getStatus() != null && dto.getStatus() == 1 && before != 1) {
+            notifyService.notifyPostPublished(article.getAuthorId(), id,
+                    article.getTitle() != null ? article.getTitle() : exists.getTitle(),
+                    article.getSummary() != null ? article.getSummary() : exists.getSummary());
+        }
         return Result.ok();
     }
 
@@ -252,9 +283,21 @@ public class ArticleAdminController {
         /** 0草稿 1已发布 2定时发布 */
         private Integer status;
         private Integer isTop;
+        /** 作者（不传则记为当前登录管理员；老文章编辑时保留原作者） */
+        private Long authorId;
         /** 前端回传格式与详情接口一致（yyyy-MM-dd HH:mm:ss），必须注解否则 Jackson 按 ISO 解析报 500 */
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         private LocalDateTime publishTime;
+    }
+
+    /** 当前登录管理员 id（用于文章作者归属）；解析不到则返回 null */
+    private Long currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return null;
+        }
+        var user = sysUserMapper.selectByUsername(auth.getName());
+        return user == null ? null : user.getId();
     }
 
     /**
