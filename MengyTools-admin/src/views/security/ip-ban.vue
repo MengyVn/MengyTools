@@ -295,7 +295,7 @@ onMounted(refreshAll)
     <el-card shadow="never" class="table-card">
       <template #header>
         <div class="card-head">
-          <span>临时锁定中（连续输错密码 5 次自动锁 30 分钟）</span>
+          <span>临时锁定中</span>
           <el-button link type="primary" @click="fetchLocks">刷新</el-button>
         </div>
       </template>
@@ -321,7 +321,7 @@ onMounted(refreshAll)
           </template>
         </el-table-column>
       </el-table>
-      <p v-if="!lockList.length" class="empty">当前没有被临时锁定的 IP。</p>
+      <p v-if="!lockList.length" class="empty">当前没有被临时锁定的 IP</p>
     </el-card>
   </div>
 </template>
