@@ -41,7 +41,8 @@ export default defineEventHandler(async (event) => {
     { loc: '/nav', changefreq: 'weekly', priority: '0.6' },
     { loc: '/announcement', changefreq: 'weekly', priority: '0.5' },
     { loc: '/community', changefreq: 'hourly', priority: '0.9' },
-    { loc: '/community/boards', changefreq: 'weekly', priority: '0.6' }
+    { loc: '/community/boards', changefreq: 'weekly', priority: '0.6' },
+    { loc: '/community/announcements', changefreq: 'weekly', priority: '0.5' }
   ]
 
   try {
@@ -64,6 +65,23 @@ export default defineEventHandler(async (event) => {
     const sidebar = await $fetch<{ data: { activeUsers?: UserBrief[] } }>(`${api}/v1/community/sidebar`)
     for (const u of sidebar.data?.activeUsers ?? []) {
       urls.push({ loc: `/community/users/${u.id}`, changefreq: 'weekly', priority: '0.4' })
+    }
+  } catch {
+    /* 同上 */
+  }
+
+  try {
+    // 公告详情（社区侧同样可读，收录进来有利于公告被检索到）
+    const notices = await $fetch<{ data: PageResult<ArticleItem> }>(
+      `${api}/v1/portal/announcements?page=1&size=100`
+    )
+    for (const n of notices.data?.records ?? []) {
+      urls.push({
+        loc: `/community/announcements/${n.id}`,
+        lastmod: n.publishTime || n.createTime,
+        changefreq: 'monthly',
+        priority: '0.4'
+      })
     }
   } catch {
     /* 同上 */

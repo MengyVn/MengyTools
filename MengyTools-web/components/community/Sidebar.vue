@@ -1,15 +1,32 @@
 <script setup lang="ts">
 /**
- * 社区侧栏：站点统计 + 热门标签 + 活跃用户。
- * 数据来自单次聚合接口 /v1/community/sidebar，避免并发多个小请求。
+ * 社区侧栏：站点统计 + 最近公告 + 板块 + 活跃用户。
+ * 统计数据来自单次聚合接口 /v1/community/sidebar；公告单独取一次（同一请求内按 key 缓存）。
  */
 import { useCommunity, formatCount } from '~/composables/useCommunity'
+import { useAnnouncement, type AnnouncementItem } from '~/composables/useAnnouncement'
 import { imageUrl } from '~/utils/image'
 
 const { sidebar } = useCommunity()
+const { fetchActive } = useAnnouncement()
 
 // key 固定：同一请求内多页复用，SSR 只取一次
 const { data } = await useAsyncData('community-sidebar', () => sidebar())
+
+/** 最近公告：取当前生效的前 4 条（与门户公告同源） */
+const { data: notices } = await useAsyncData('community-sidebar-notices', async () => {
+  try {
+    const list = await fetchActive()
+    return (Array.isArray(list) ? list : []).slice(0, 4) as AnnouncementItem[]
+  } catch {
+    return [] as AnnouncementItem[]
+  }
+})
+
+const noticeDate = (it: AnnouncementItem) => {
+  const t = it.publishTime || it.createTime
+  return t ? String(t).replace('T', ' ').slice(5, 16) : ''
+}
 
 const stats = computed(() => {
   const d = data.value
@@ -34,6 +51,19 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
           <span>{{ s.label }}</span>
         </li>
       </ul>
+    </section>
+
+    <section v-if="notices?.length" class="sb-card">
+      <h3 class="sb-title">公告</h3>
+      <ul class="sb-notices">
+        <li v-for="n in notices" :key="n.id">
+          <NuxtLink :to="`/community/announcements/${n.id}`" class="sb-notice">
+            <span class="sb-notice-title">{{ n.title }}</span>
+            <span class="sb-notice-time">{{ noticeDate(n) }}</span>
+          </NuxtLink>
+        </li>
+      </ul>
+      <NuxtLink to="/community/announcements" class="sb-more">全部公告 →</NuxtLink>
     </section>
 
     <section v-if="data?.boards?.length" class="sb-card">
@@ -134,6 +164,39 @@ const initials = (name?: string) => (name || '?').slice(0, 1).toUpperCase()
   margin-top: 10px;
   color: var(--c-accent);
   font-size: 12.5px;
+}
+.sb-notices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sb-notice {
+  display: block;
+  padding: 6px 4px;
+  border-radius: var(--c-radius);
+}
+.sb-notice:hover {
+  background: var(--c-surface-alt);
+}
+.sb-notice-title {
+  display: block;
+  color: var(--c-text);
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.sb-notice:hover .sb-notice-title {
+  color: var(--c-accent);
+}
+.sb-notice-time {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-faint);
+  font-size: 12px;
 }
 .sb-users {
   list-style: none;

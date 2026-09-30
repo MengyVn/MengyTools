@@ -153,6 +153,9 @@ const year = new Date().getFullYear()
       </div>
     </header>
 
+    <!-- 顶部公告条：仅展示后台勾了「跑马灯」的公告，可关闭，关闭态与门户共用同一套 key -->
+    <CommunityAnnouncementBar />
+
     <main class="c-main">
       <div class="c-container">
         <slot />
@@ -169,6 +172,7 @@ const year = new Date().getFullYear()
           <NuxtLink to="/community">首页</NuxtLink>
           <NuxtLink to="/community/boards">板块</NuxtLink>
           <NuxtLink to="/community/search">搜索</NuxtLink>
+          <NuxtLink to="/community/announcements">公告</NuxtLink>
         </div>
         <p class="c-copyright">© {{ year }} {{ siteName }}</p>
       </div>

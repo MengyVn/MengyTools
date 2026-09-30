@@ -15,6 +15,7 @@ export const COMMUNITY_SITE = {
   nav: [
     { to: '/community', label: '首页' },
     { to: '/community/boards', label: '板块' },
+    { to: '/community/announcements', label: '公告' },
     { to: '/community/search', label: '搜索' }
   ]
 }
