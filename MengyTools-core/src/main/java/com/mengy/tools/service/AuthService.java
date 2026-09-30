@@ -51,8 +51,22 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final StringRedisTemplate redisTemplate;
+    private final LoginLogService loginLogService;
+    private final IpBanService ipBanService;
 
-    public TokenResponse login(String username, String password, String loginIp) {
+    /**
+     * 登录。
+     *
+     * @param userAgent 浏览器 UA，仅用于登录日志留痕
+     */
+    public TokenResponse login(String username, String password, String loginIp, String userAgent) {
+        // 0. 人工封禁检查（过滤器已拦 HTTP 层，这里再兜一次，保证服务层自身安全）
+        if (ipBanService.isBanned(loginIp)) {
+            loginLogService.record(username, null, loginIp, userAgent, false, "IP 已被封禁，拒绝登录");
+            throw new BusinessException(ResultCode.USER_PASSWORD_ERROR,
+                    "你的 IP 已被系统封禁，如有疑问请联系管理员");
+        }
+
         // 1. IP 锁定检查：达到失败上限后直接拒绝
         String lockKey = LOCK_KEY_PREFIX + loginIp;
         if (Boolean.TRUE.equals(redisTemplate.hasKey(lockKey))) {
@@ -60,6 +74,7 @@ public class AuthService {
             String msg = (remainMinutes != null && remainMinutes > 0)
                     ? "登录失败次数过多，IP 已被锁定，请 " + remainMinutes + " 分钟后再试"
                     : "IP 已被锁定，请稍后再试";
+            loginLogService.record(username, null, loginIp, userAgent, false, msg);
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR, msg);
         }
 
@@ -73,17 +88,20 @@ public class AuthService {
                 redisTemplate.expire(failKey, LOCK_DURATION);
             }
             long remain = MAX_FAIL_COUNT - (count == null ? 0 : count);
+            String msg;
             if (remain <= 0) {
                 // 达到上限：设置 IP 锁定
                 redisTemplate.opsForValue().set(lockKey, "1", LOCK_DURATION);
                 log.warn("IP 登录失败达上限，已锁定: ip={}, username={}", loginIp, username);
-                throw new BusinessException(ResultCode.USER_PASSWORD_ERROR,
-                        "密码错误次数过多，IP 已被锁定 30 分钟");
+                msg = "密码错误次数过多，IP 已被锁定 30 分钟";
+            } else {
+                msg = "用户名或密码错误，剩余 " + remain + " 次尝试机会";
             }
-            throw new BusinessException(ResultCode.USER_PASSWORD_ERROR,
-                    "用户名或密码错误，剩余 " + remain + " 次尝试机会");
+            loginLogService.record(username, user == null ? null : user.getId(), loginIp, userAgent, false, msg);
+            throw new BusinessException(ResultCode.USER_PASSWORD_ERROR, msg);
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
+            loginLogService.record(username, user.getId(), loginIp, userAgent, false, "账号已被禁用");
             throw new BusinessException(ResultCode.USER_DISABLED);
         }
 
@@ -104,6 +122,7 @@ public class AuthService {
                 .build();
 
         updateLoginInfo(user.getId(), loginIp);
+        loginLogService.record(username, user.getId(), loginIp, userAgent, true, "登录成功");
         log.info("用户登录成功: username={}, ip={}", username, loginIp);
         return response;
     }

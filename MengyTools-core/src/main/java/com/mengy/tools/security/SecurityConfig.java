@@ -31,6 +31,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final IpBanFilter ipBanFilter;
     private final SecurityProperties securityProperties;
 
     @Bean
@@ -59,6 +60,11 @@ public class SecurityConfig {
                         .accessDeniedHandler((req, resp, e) ->
                                 resp.sendError(403, "无权访问"))
                 )
+                // 两个自定义过滤器的先后 = 这里的注册顺序（都锚在 UsernamePasswordAuthenticationFilter 之前）：
+                // IpBanFilter 先跑，被封禁的 IP 直接 403；随后才走 JWT 鉴权。
+                // 注意：不能写成 addFilterBefore(ipBanFilter, JwtAuthenticationFilter.class)，
+                // 自定义过滤器没有注册顺序，Spring Security 会直接启动失败。
+                .addFilterBefore(ipBanFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

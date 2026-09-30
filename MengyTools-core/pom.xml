@@ -160,6 +160,17 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!--
+          IP 归属地解析（登录日志）。
+          选 jar 自带 ip2region.xdb 数据的包：解析全程离线，不把访客 IP 发给第三方接口。
+          代码里只用传递依赖 org.lionsoul:ip2region 的 Searcher，数据从 classpath 加载。
+        -->
+        <dependency>
+            <groupId>com.junmoyu</groupId>
+            <artifactId>ip2region</artifactId>
+            <version>1.0.0</version>
+        </dependency>
     </dependencies>
 
     <build>

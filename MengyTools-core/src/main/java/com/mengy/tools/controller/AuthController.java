@@ -8,6 +8,7 @@ import com.mengy.tools.dto.TokenResponse;
 import com.mengy.tools.dto.UserInfoResponse;
 import com.mengy.tools.service.AuthService;
 import com.mengy.tools.service.MenuService;
+import com.mengy.tools.util.ClientIpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,8 @@ public class AuthController {
     public Result<TokenResponse> login(@Valid @RequestBody LoginRequest request,
                                        HttpServletRequest httpRequest) {
         return Result.ok(authService.login(
-                request.getUsername(), request.getPassword(), resolveClientIp(httpRequest)));
+                request.getUsername(), request.getPassword(),
+                ClientIpUtils.resolve(httpRequest), httpRequest.getHeader("User-Agent")));
     }
 
     @PostMapping("/refresh")
@@ -55,16 +57,8 @@ public class AuthController {
         return Result.ok(menuService.getCurrentUserMenuTree());
     }
 
+    /** 客户端 IP 解析统一走 ClientIpUtils：登录日志与封禁拦截必须是同一口径 */
     private String resolveClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            // 多级代理取第一个
-            return ip.split(",")[0].trim();
-        }
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip;
-        }
-        return request.getRemoteAddr();
+        return ClientIpUtils.resolve(request);
     }
 }
