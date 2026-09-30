@@ -59,7 +59,12 @@ public class AnnouncementPortalController {
     }
 
     /**
-     * 公告详情（含完整 content）。仅返回已发布且已到发布时间的公告，同时累加阅读量。
+     * 公告详情（含完整 content）。仅返回已发布且已到发布时间的公告。
+     *
+     * 阅读量刻意不在这里自增，与文章保持一致：
+     *   详情接口保持只读，计数由前端埋点 POST /v1/track/announcement/view 负责，
+     *   后端按「公告+访客ID」24 小时去重。
+     * 此前这里也加一次，导致门户每次打开公告 +2（详情接口 1 次 + 埋点 1 次）。
      */
     @GetMapping("/{id}")
     public Result<AnnouncementDetailDTO> get(@PathVariable Long id) {
@@ -69,7 +74,6 @@ public class AnnouncementPortalController {
         }
         AnnouncementDetailDTO dto = new AnnouncementDetailDTO();
         BeanUtils.copyProperties(ann, dto);
-        announcementMapper.incrementViewCount(id);
         return Result.ok(dto);
     }
 }
