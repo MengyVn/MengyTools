@@ -3,7 +3,8 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=true
     username: ${MYSQL_USER}
-    password: 123456
+    # 生产必须用环境变量注入，不留默认值
+    password: ${MYSQL_PASSWORD}
     # need.md 5.1：生产环境更严格控制
     hikari:
       maximum-pool-size: 10
